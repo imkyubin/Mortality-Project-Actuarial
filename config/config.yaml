@@ -1,0 +1,119 @@
+project:
+  name: mortality_cdc_wonder
+  version: 0.1.0
+  description: CDC WONDER mortality modeling portfolio project.
+
+data:
+  raw_file: data/raw/ucod_2015_2020_single_age_sex.csv
+  processed_file: data/processed/clean_mortality.csv
+  output_dir: data/outputs
+
+current_scope:
+  description: Initial Python validation scope matching the Excel workbook.
+  years:
+    start: 2015
+    end: 2020
+  ages:
+    min: 20
+    max: 84
+  sex:
+    - Female
+    - Male
+    - Total
+  location:
+    - United States
+  cause_of_death:
+    - All causes
+
+workflow:
+  step_1_excel_validation:
+    description: Reproduce the existing Excel mortality table workflow in Python.
+    input_source: Manually exported CDC WONDER CSV used in the Excel workbook.
+    output_goal: Validate qx, px, lx, dx, Lx, Tx, and ex against the Excel/reference outputs.
+    years:
+      start: 2015
+      end: 2020
+    age_basis: single_year_age
+    ages:
+      min: 20
+      max: 84
+
+  step_2_modern_single_age_model:
+    description: Detailed modern mortality modeling dataset.
+    input_source: Manually exported CDC WONDER files for 1999-2024.
+    years:
+      start: 1999
+      end: 2024
+    age_basis: single_year_age
+    ages:
+      min: 20
+      max: 84
+    models:
+      - lee_carter
+      - poisson_lee_carter
+    use_case: Primary detailed age-specific mortality modeling and forecasting.
+
+  step_3_holistic_harmonized_model:
+    description: Long historical model using harmonized CDC age groups.
+    input_source: Manually exported CDC WONDER compressed and modern mortality files.
+    years:
+      start: 1968
+      end: 2024
+    age_basis: harmonized_grouped_age
+    harmonization_rule: Aggregate modern single-year ages to match the older CDC grouped-age structure before fitting models.
+    models:
+      - lee_carter
+      - poisson_lee_carter
+    use_case: Long-run mortality trend comparison with reduced age detail.
+    limitations:
+      - Uses grouped ages rather than single-year ages.
+      - Historical files span ICD-8, ICD-9, and ICD-10 eras.
+      - Cause-specific analysis requires extra caution across ICD revisions.
+      - 2018-2024 files may use different race/population methodology.
+
+target_parameters:
+  locations:
+    - United States
+    - California
+    - Texas
+    - Florida
+    - New York
+    - Illinois
+  sex:
+    - Male
+    - Female
+    - Total
+  cause_of_death:
+    - All causes
+    - Cancer
+    - Heart disease
+    - Stroke
+    - Diabetes
+    - Alzheimer's disease
+    - Chronic lower respiratory disease
+    - COVID-19
+    - Drug-induced deaths
+    - External causes/accidents
+    - Suicide
+  optional_demographics:
+    - Race
+    - Hispanic origin
+
+age_handling:
+  primary_model_ages: 20-84
+  younger_ages: Keep available in raw/cleaned data if present, but exclude from the first primary model.
+  older_ages: Exclude from rate-based models when population exposure is missing.
+  not_stated_age: Exclude from age-specific models and track in validation notes.
+
+life_table:
+  radix: 100000
+  qx_method: deaths_divided_by_population
+  final_age: 84
+
+modeling:
+  main_model: lee_carter
+  secondary_model: poisson_lee_carter
+  forecast_horizon_years: 10
+
+reporting:
+  default_output: reports/mortality_model_report.md
