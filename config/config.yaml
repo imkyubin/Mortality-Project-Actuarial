@@ -71,7 +71,23 @@ workflow:
       - Cause-specific analysis requires extra caution across ICD revisions.
       - 2018-2024 files may use different race/population methodology.
 
-target_parameters:
+active_parameters:
+  description: Parameters used by the current Excel-validation and first Python workflow.
+  location:
+    - United States
+  sex:
+    - Male
+    - Female
+    - Total
+  age_basis: single_year_age
+  ages:
+    min: 20
+    max: 84
+  cause_of_death:
+    - All causes
+
+future_reporting_parameters:
+  description: Later dashboard/report filters after the expanded datasets are cleaned and validated.
   locations:
     - United States
     - California
@@ -104,6 +120,58 @@ age_handling:
   younger_ages: Keep available in raw/cleaned data if present, but exclude from the first primary model.
   older_ages: Exclude from rate-based models when population exposure is missing.
   not_stated_age: Exclude from age-specific models and track in validation notes.
+
+quality_bar:
+  description: Criteria for making the project strong enough for a prestigious actuarial/data science review.
+  end_to_end_run:
+    requirement: The project runs from raw CDC WONDER data to final outputs with one command.
+    status: planned
+    evidence_needed:
+      - Reproducible command documented in README.
+      - Raw-to-cleaned data pipeline.
+      - Model fitting outputs.
+      - Dashboard exports.
+      - Final report or memo generated from saved model results.
+  lee_carter_benchmark:
+    requirement: Lee-Carter output is compared against a published benchmark when using comparable data.
+    status: planned
+    benchmark_source: Human Mortality Database US Lee-Carter or equivalent published mortality benchmark.
+    evidence_needed:
+      - Document data differences before comparison.
+      - Compare ax, bx, and kt where definitions align.
+      - Define reasonable tolerance.
+      - Explain any material mismatch.
+  kt_uncertainty:
+    requirement: kt forecasts include correct uncertainty intervals.
+    status: planned
+    method: Random walk with drift using estimated drift variance.
+    evidence_needed:
+      - Symmetric intervals around forecast kt.
+      - Intervals widen with forecast horizon.
+      - Formula documented in forecasting module or report.
+  actuarial_memo:
+    requirement: At least one output is formatted as a one-page actuarial-style memo.
+    status: planned
+    required_sections:
+      - Purpose and scope.
+      - Data and assumptions.
+      - Methods.
+      - Key results.
+      - Limitations.
+      - Reliance statement.
+      - Actuarial review note.
+  ai_review_gate:
+    requirement: AI-generated interpretation is explicitly marked as requiring human actuarial review.
+    status: planned
+    required_language: AI-generated interpretation - actuarial review required before client or external use.
+  validation_failure_mode:
+    requirement: Validation includes at least one place where the model performs poorly and explains why.
+    status: planned
+    candidate_failure_mode: Lee-Carter may perform poorly for young adult mortality affected by drug-induced deaths or external causes.
+    evidence_needed:
+      - Residual plot or error metric showing poor fit.
+      - Plain-English diagnosis.
+      - Proposed structural fix, such as cause-specific modeling, age segmentation, or cohort/period shock adjustment.
 
 life_table:
   radix: 100000
