@@ -4,12 +4,27 @@ project:
   description: CDC WONDER mortality modeling portfolio project.
 
 data:
-  raw_file: data/raw/ucod_2015_2020_single_age_sex.csv
-  processed_file: data/processed/clean_mortality.csv
+  modern_single_age_file: data/processed/new_1999_2024.csv
+  harmonized_file: data/processed/harmonized_1968-2024.csv
+  processed_file: data/processed/new_1999_2024.csv
   output_dir: data/outputs
 
+excel_reference:
+  workflow_doc: Phase1_Hands_On/Excel/Mortality Table Project Workflow.docx
+  workbook: Phase1_Hands_On/Excel/Mortality_Workbook.xlsx
+  purpose: Use the Excel workbook as the validation reference for formulas, charts, dashboard metrics, and first modeling examples.
+  python_data_source_note: Recreate the Excel workflow from data/processed/new_1999_2024.csv instead of importing the workbook's manually exported CDC WONDER CSV.
+
+outputs:
+  tables_dir: data/outputs/tables
+  figures_dir: data/outputs/figures
+  validation_dir: data/outputs/validation
+  models_dir: data/outputs/models
+  reports_dir: reports
+  report_figures_dir: reports/figures
+
 current_scope:
-  description: Initial Python validation scope matching the Excel workbook.
+  description: Initial Python validation scope matching the Excel workbook, filtered from the processed modern single-age dataset.
   years:
     start: 2015
     end: 2020
@@ -27,8 +42,10 @@ current_scope:
 
 workflow:
   step_1_excel_validation:
-    description: Reproduce the existing Excel mortality table workflow in Python.
-    input_source: Manually exported CDC WONDER CSV used in the Excel workbook.
+    description: Reproduce the existing Excel mortality table workflow in Python using a validation slice from the processed modern dataset.
+    input_source: data/processed/new_1999_2024.csv
+    source_dataset: modern_single_age_file
+    filter_rule: Select the workbook validation years and age range from the processed 1999-2024 single-age file instead of importing the manually exported CDC WONDER workbook CSV.
     output_goal: Validate qx, px, lx, dx, Lx, Tx, and ex against the Excel/reference outputs.
     years:
       start: 2015
@@ -37,10 +54,58 @@ workflow:
     ages:
       min: 20
       max: 84
+    excel_alignment:
+      cleanup_steps:
+        - Treat blank sex values as Total when reproducing the original workbook logic.
+        - Keep Year Code, Single-Year Ages Code, Sex Code, Deaths, and Population.
+        - Filter to ages 20-84 because age 85+ lacks population exposure.
+        - Sort by year, sex, and increasing age before recursive life table calculations.
+      life_table_columns:
+        qx: Deaths divided by Population.
+        px: 1 minus qx.
+        lx: Recursive surviving cohort count with l20 equal to the radix.
+        dx: qx times lx.
+        Lx: lx minus 0.5 times dx, assuming deaths are uniformly distributed within each age interval.
+        Tx: Backward recursive sum of Lx from current age through age 84.
+        ex: Tx divided by lx.
+        cumulative_survival: lx divided by radix.
+      validation_outputs:
+        - Cleaned validation table for years 2015-2020 and ages 20-84.
+        - Life table columns matching the Excel workbook formulas.
+        - Comparison table or notes documenting any differences from Excel outputs.
+      visualization_outputs:
+        - qx line graph by age and sex.
+        - log qx or log mx line graph by age and sex.
+        - survival curve by age and sex.
+        - life expectancy ex line graph by age and sex.
+        - death rate distribution.
+      excel_alignment:
+      starting_model_scope:
+        year: 2019
+        sex: Female
+        rationale: Use a pre-COVID year for the first model example, matching the Excel workflow.
+      modeling_sequence:
+        - Gompertz model on ln(mx) versus age.
+        - Residual plot for observed mx versus fitted Gompertz mx.
+        - Moving average graduation using 3-year and 5-year age windows.
+        - Mortality improvement tables by year and sex.
+        - Makeham model using nonlinear least squares.
+        - Whittaker-Henderson graduation using a second-difference roughness penalty.
+        - Lee-Carter model using ln(mx) = ax + bx * kt + error.
+      forecast_sequence:
+        - Calculate delta kt by year.
+        - Estimate drift as the mean delta kt.
+        - Estimate kt residual standard deviation.
+        - Forecast kt with widening confidence intervals.
+        - Convert forecast kt back to forecast mortality rates.
+      dashboard_outputs:
+        - KPI values for life expectancy and survival by selected age, sex, and year.
+        - Year filter equivalent to the Excel slicer.
 
   step_2_modern_single_age_model:
     description: Detailed modern mortality modeling dataset.
-    input_source: Manually exported CDC WONDER files for 1999-2024.
+    input_source: data/processed/new_1999_2024.csv
+    source_dataset: modern_single_age_file
     years:
       start: 1999
       end: 2024
@@ -52,10 +117,12 @@ workflow:
       - lee_carter
       - poisson_lee_carter
     use_case: Primary detailed age-specific mortality modeling and forecasting.
+    
 
   step_3_holistic_harmonized_model:
     description: Long historical model using harmonized CDC age groups.
-    input_source: Manually exported CDC WONDER compressed and modern mortality files.
+    input_source: data/processed/harmonized_1968-2024.csv
+    source_dataset: harmonized_file
     years:
       start: 1968
       end: 2024
