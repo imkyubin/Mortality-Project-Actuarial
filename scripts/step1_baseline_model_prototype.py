@@ -582,7 +582,173 @@ def plot_heatmap(df, sex_code, column):
 
     plt.tight_layout()
     plt.show()
+
+def lc_matrix(df, sex_code):
+    df_model = df[
+        df["Sex Code"] == sex_code
+    ].copy()
+
+    df_model["ln_qx"] = np.log(df_model["qx"]).to_numpy()
+
+    model_pivot = df_model.pivot_table(
+        index="Single-Year Ages Code",
+        columns="Year Code",
+        values="ln_qx",
+        aggfunc="first"
+    )
+
+    matrix = model_pivot.to_numpy()
+    ages = model_pivot.index.to_numpy()
+    years = model_pivot.columns.to_numpy()
+
+    return matrix, ages, years
+
+def fit_lee_carter(lc_matrix):
+    ax = np.mean(lc_matrix, axis=1)
+    centered = lc_matrix - ax[:, None]
+
+    U, S, Vt = np.linalg.svd(centered, full_matrices=False)
+
+    bx_raw = U[:, 0]
+    kt_raw = S[0] * Vt[0, :]
+
+    bx = bx_raw / np.sum(bx_raw)
+    kt = kt_raw * np.sum(bx_raw)
+
+    return ax, bx, kt
+
+def reconstruct_lc(ax, bx, kt):
+    fitted_ln_qx = ax[:, None] + np.outer(bx, kt)
+
+    return fitted_ln_qx
+
+def build_lc_tables(ax, bx, kt, fitted_ln_qx, ages, years):
+    age_df = pd.DataFrame({
+        "age": ages,
+        "ax": ax,
+        "bx": bx,
+    })
+
+    year_df = pd.DataFrame({
+        "year": years,
+        "kt": kt,
+    })
+
+    fitted_wide = pd.DataFrame(
+        fitted_ln_qx,
+        index=ages,
+        columns=years,
+    )
+
+    fitted_df = (
+        fitted_wide
+        .rename_axis(index="age", columns="year")
+        .stack()
+        .reset_index(name="fitted_ln_qx")
+    )
+
+    fitted_df["fitted_qx"] = np.exp(fitted_df["fitted_ln_qx"])
+
+    return age_df, year_df, fitted_df
+
+def calculate_kt_changes(year_df):
+    year_sorted = year_df.sort_values(by="year").copy()
+    year_sorted["delta_kt"] = year_sorted["kt"].diff()
+
+    return year_sorted
+
+def estimate_drift(year_df):
+    drift = year_df["delta_kt"].dropna().mean()
+    sigma = year_df["delta_kt"].dropna().std()
+
+    return drift, sigma
+
+def forecast_kt(year_df, drift, sigma, forecast_years):
+    last_kt = year_df.sort_values("year")["kt"].iloc[-1]
+    last_year = year_df.sort_values("year")["year"].iloc[-1]
+
+    steps = np.arange(1, forecast_years + 1)
+    future_years = last_year + steps
+
+    kt_forecast = last_kt + steps * drift
+    standard_error = sigma * np.sqrt(steps)
+
+    kt_lower = kt_forecast - 1.96 * standard_error
+    kt_upper = kt_forecast + 1.96 * standard_error
+
+    kt_forecast_df = pd.DataFrame({
+        "year": future_years,
+        "step": steps,
+        "kt_forecast": kt_forecast,
+        "kt_lower": kt_lower,
+        "kt_upper": kt_upper,
+    })
+
+    return kt_forecast_df
+
+def forecast_mortality(age_df, kt_forecast_df):
+    forecast_df = age_df.merge(
+        kt_forecast_df,
+        how="cross",
+    )
+
+    forecast_df["forecast_ln_qx"] = (
+        forecast_df["ax"]
+        + forecast_df["bx"] * forecast_df["kt_forecast"]
+    )
+
+    forecast_df["forecast_qx"] = np.exp(
+        forecast_df["forecast_ln_qx"]
+    )
+
+    return forecast_df
+
+def plot_kt_forecast(year_df, kt_forecast_df):
+    columns = ["year", "kt", "kt_lower", "kt_upper"]
+
+    renamed_forecast = kt_forecast_df.rename(columns={"kt_forecast": "kt"})
+
+    filtered_year = year_df.reindex(columns=columns)
+    filtered_forecast = renamed_forecast.reindex(columns=columns)
+
+    combined = pd.concat(
+        [filtered_year, filtered_forecast],
+        axis=0,
+        join="inner",
+        ignore_index=True
+    )
+
+    plt.figure(figsize=(8, 6))
+
+    plt.plot(
+        combined["year"],
+        combined["kt"],
+        label="kt"
+    )
+
+    plt.plot(
+        combined["year"],
+        combined["kt_lower"],
+        color="red",
+        linestyle="--"
+    )
+
+    plt.plot(
+        combined["year"],
+        combined["kt_upper"],
+        color="red",
+        linestyle="--"
+    )
+
+    plt.title("kt Forecast")
+    plt.xlabel("Year")
+    plt.ylabel("kt")
+    plt.legend()
+    plt.grid(True)
+    plt.tight_layout()
+    plt.show()
     
+
 def main():
     mortality_df = load_data(INPUT_FILE)
     validation_df = filter_for_excel(mortality_df)
@@ -617,6 +783,15 @@ def main():
     plot_heatmap(heatmap_table, "T", "qx_yoy_pct")
     plot_heatmap(heatmap_table, "F", "qx_yoy_pct")
     plot_heatmap(heatmap_table, "M", "qx_yoy_pct")
+
+    lee_carter_matrix, ages, years = lc_matrix(life_df, "T")
+    ax, bx, kt = fit_lee_carter(lee_carter_matrix)
+    fitted_ln_qx = reconstruct_lc(ax, bx, kt)
+    _, year_df, _ = build_lc_tables(ax, bx, kt, fitted_ln_qx, ages, years)
+    year_sorted = calculate_kt_changes(year_df)
+    drift, sigma = estimate_drift(year_sorted)
+    kt_forecast_df = forecast_kt(year_df, drift, sigma, 5)
+    plot_kt_forecast(year_df, kt_forecast_df)
 
 if __name__ == "__main__":
     main()
