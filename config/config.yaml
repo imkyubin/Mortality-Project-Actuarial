@@ -1,19 +1,23 @@
 project:
   name: mortality_cdc_wonder
-  version: 0.1.0
+  version: 0.2.0
   description: CDC WONDER mortality modeling portfolio project.
+  resume_goal: Entry-level/intern actuarial portfolio piece demonstrating life table construction, mortality modeling (Lee-Carter family), data engineering, dashboarding, API design, and applied AI engineering with grounded/RAG-based reporting.
 
 data:
   modern_single_age_file: data/processed/new_1999_2024.csv
   harmonized_file: data/processed/harmonized_1968-2024.csv
   processed_file: data/processed/new_1999_2024.csv
   output_dir: data/outputs
+  status: raw_to_processed_pipeline_done
+  known_data_quality_risk: CDC WONDER suppresses death counts under 10 as non-numeric text. Current cleaning (src/data/cleaning.py) does not yet explicitly detect or document suppressed cells; pd.to_numeric(errors="coerce") silently turns them into NaN, which can propagate through the recursive lx calculation for an entire year/sex group. Needs explicit handling and documentation before step 2, and is a good candidate for quality_bar.validation_failure_mode.
 
 excel_reference:
   workflow_doc: Phase1_Hands_On/Excel/Mortality Table Project Workflow.docx
   workbook: Phase1_Hands_On/Excel/Mortality_Workbook.xlsx
   purpose: Use the Excel workbook as the validation reference for formulas, charts, dashboard metrics, and first modeling examples.
   python_data_source_note: Recreate the Excel workflow from data/processed/new_1999_2024.csv instead of importing the workbook's manually exported CDC WONDER CSV.
+  validation_depth: Spot-check one age/sex/year combination against the workbook, not a full reconciliation table. See workflow.step_1_baseline_model_prototype.
 
 outputs:
   tables_dir: data/outputs/tables
@@ -22,6 +26,7 @@ outputs:
   models_dir: data/outputs/models
   reports_dir: reports
   report_figures_dir: reports/figures
+  status: folders_created_pending_use
 
 current_scope:
   description: Initial Python validation scope matching the Excel workbook, filtered from the processed modern single-age dataset.
@@ -41,12 +46,15 @@ current_scope:
     - All causes
 
 workflow:
-  step_1_excel_validation:
-    description: Reproduce the existing Excel mortality table workflow in Python using a validation slice from the processed modern dataset.
+  step_1_baseline_model_prototype:
+    status: core_logic_complete_in_script_not_yet_refactored
+    implementation: scripts/step1_baseline_model_prototype.py
+    description: Prototype the full actuarial workflow end-to-end (life table, graduation methods, Lee-Carter, and kt forecast) on a small validation slice before scaling to the full modern dataset in step 2 and the harmonized long history in step 3. Originally framed as pure Excel validation; that is now a minor spot-check rather than the point of this step.
     input_source: data/processed/new_1999_2024.csv
     source_dataset: modern_single_age_file
     filter_rule: Select the workbook validation years and age range from the processed 1999-2024 single-age file instead of importing the manually exported CDC WONDER workbook CSV.
-    output_goal: Validate qx, px, lx, dx, Lx, Tx, and ex against the Excel/reference outputs.
+    output_goal: Spot-check qx, px, lx, dx, Lx, Tx, and ex for one age/sex/year against the Excel/reference outputs rather than a full reconciliation; project priority has shifted to the dashboard, API, and LLM-supported reporting layers.
+    next_action: Extract the validated functions into src/actuarial/ (life_table.py, graduation.py, lee_carter.py, forecasting.py) so step 2 and step 3 reuse them instead of copy-pasting this script.
     years:
       start: 2015
       end: 2020
@@ -54,7 +62,7 @@ workflow:
     ages:
       min: 20
       max: 84
-    excel_alignment:
+    life_table_build:
       cleanup_steps:
         - Treat blank sex values as Total when reproducing the original workbook logic.
         - Keep Year Code, Single-Year Ages Code, Sex Code, Deaths, and Population.
@@ -72,14 +80,14 @@ workflow:
       validation_outputs:
         - Cleaned validation table for years 2015-2020 and ages 20-84.
         - Life table columns matching the Excel workbook formulas.
-        - Comparison table or notes documenting any differences from Excel outputs.
+        - Spot-check qx, lx, and ex for one age/sex/year combination against the Excel workbook; a full comparison table across all years/ages/sexes is deprioritized, not required to consider step 1 complete.
       visualization_outputs:
         - qx line graph by age and sex.
         - log qx or log mx line graph by age and sex.
         - survival curve by age and sex.
         - life expectancy ex line graph by age and sex.
         - death rate distribution.
-      excel_alignment:
+    modeling_prototype:
       starting_model_scope:
         year: 2019
         sex: Female
@@ -98,12 +106,10 @@ workflow:
         - Estimate kt residual standard deviation.
         - Forecast kt with widening confidence intervals.
         - Convert forecast kt back to forecast mortality rates.
-      dashboard_outputs:
-        - KPI values for life expectancy and survival by selected age, sex, and year.
-        - Year filter equivalent to the Excel slicer.
 
   step_2_modern_single_age_model:
-    description: Detailed modern mortality modeling dataset.
+    status: planned_next
+    description: The primary, production-quality mortality model. Unlike step 1's deliberately exhaustive prototype toolbox, step 2 intentionally uses only the small set of models an actuary would actually rely on in practice, fit on the full modern single-age dataset.
     input_source: data/processed/new_1999_2024.csv
     source_dataset: modern_single_age_file
     years:
@@ -116,10 +122,35 @@ workflow:
     models:
       - lee_carter
       - poisson_lee_carter
-    use_case: Primary detailed age-specific mortality modeling and forecasting.
-    
+    model_selection_rationale: Lee-Carter and Poisson Lee-Carter are the two models genuinely used in real-world mortality and longevity work; Poisson Lee-Carter is the correct refinement because it fits deaths as counts against population exposure instead of only pre-smoothed rates. Deliberately excludes step 1's wider toolbox (Gompertz, Makeham, moving-average, Whittaker-Henderson) as this step's headline model, though those remain available as graduation/smoothing utilities where useful.
+    engineering_tasks:
+      - Handle CDC WONDER suppressed-cell values explicitly (see data.known_data_quality_risk) before fitting; do not let them silently propagate through the life table.
+      - Extract and reuse validated logic from scripts/step1_baseline_model_prototype.py into src/actuarial/ instead of duplicating it in a new script.
+      - Add unit tests for life table invariants (l0 equals radix, lx non-increasing with age, Tx at the final age equals Lx at the final age).
+    validation:
+      lee_carter_benchmark: Compare ax, bx, and kt against the Human Mortality Database US Lee-Carter output or an equivalent published benchmark; document data differences and define a tolerance before comparing. See quality_bar.lee_carter_benchmark.
+      kt_uncertainty: Random walk with drift; forecast intervals must widen with horizon. See quality_bar.kt_uncertainty.
+    use_case: Primary detailed age-specific mortality modeling and forecasting; the model that the dashboard, API, and LLM reporting layers read from.
+    whittaker_henderson_utility:
+      status: in_progress
+      location: src/actuarial/whittaker_henderson.py
+      purpose: Reusable Whittaker-Henderson graduation/smoothing utility per model_selection_rationale above (not the step 2 headline model). Extends step 1's single hand-picked year/sex slice into a fit across every year/sex group in the full modern dataset.
+      known_issue: Line 5 import currently reads `import matplotlib.colors import TwoSlopeNorm` (invalid syntax); must be corrected to `from matplotlib.colors import TwoSlopeNorm` before anything else in the file will run.
+      build_order:
+        - "_second_difference_matrix(n): unchanged helper, reused directly by fit_whittaker_henderson and again by the lambda elbow plot's smoothness term."
+        - "fit_whittaker_henderson(df, year, sex_code, lambda_, pop_weights): unchanged single year/sex fit ported from scripts/step1_baseline_model_prototype.py; the shared building block every function below calls."
+        - "fit_wh_all(df, lambda_, pop_weights): new. Loops fit_whittaker_henderson over every Year Code / Sex Code group in df and concatenates results into one long-format frame; step 2's actual entry point, feeds both the residual heatmap and the cumulative deviations plot."
+        - "plot_lambda_elbow(df, year, sex_code, lambda_grid, pop_weights): new. Runs fit_whittaker_henderson once per lambda_ in a grid for one representative slice, plots Smoothness (roughness penalty via _second_difference_matrix) against Fit (weighted residual sum of squares); the elbow informs the lambda_ default, so build before finalizing fit_wh_all's default."
+        - "plot_whittaker_residual_heatmap(whittaker_df, sex_code): new. Takes fit_wh_all's output, pivots Year Code by Single-Year Ages Code with whittaker_residual as values, one call per sex, diverging colormap via TwoSlopeNorm centered at 0. Decided replacement for a per-slice residual line plot across the full 1999-2024 range."
+        - "plot_cumulative_deviations(whittaker_df): new, replaces plot_whittaker_residual (removed). Cumulative sum of whittaker_residual by age within one slice; a curve drifting away from zero reveals systematic bias, the actuarial cumulative-deviations test made visual, and a stronger diagnostic than a raw residual line."
+        - "plot_whittaker_fit(whittaker_df): unchanged, kept for spot-checking one slice's fitted curve shape; not superseded by anything above."
+      removed:
+        - "plot_whittaker_residual: superseded by plot_cumulative_deviations, which answers the same is-this-slice-biased question more directly (the standard actuarial diagnostic, not just a raw residual scatter)."
+      open_decision: Whether lambda_ is fixed across all year/sex groups in fit_wh_all or allowed to vary per group; current lean is fixed for simplicity, revisit after comparing plot_lambda_elbow results across a few different slices.
 
   step_3_holistic_harmonized_model:
+    status: planned_after_step_2
+    priority_note: Lower priority than the dashboard, API, and LLM reporting layers. Build only if time remains after step 2 and the application layer are done.
     description: Long historical model using harmonized CDC age groups.
     input_source: data/processed/harmonized_1968-2024.csv
     source_dataset: harmonized_file
@@ -138,8 +169,52 @@ workflow:
       - Cause-specific analysis requires extra caution across ICD revisions.
       - 2018-2024 files may use different race/population methodology.
 
+data_collection_strategy:
+  status: decided_not_yet_built
+  decision: Use a single static bulk pull of CDC WONDER data across a fixed, pre-chosen set of discriminating parameters instead of live per-request calls to the CDC WONDER API.
+  rationale:
+    - CDC WONDER's API is an XML request/response protocol with a different parameter codebook per database, not a simple REST call; not worth the integration cost for a project that only needs an annual data refresh.
+    - Suppression of death counts under 10 is applied per query combination; handling it once against a known static pull is far more reliable than re-handling it live for every possible user-selected combination.
+    - CDC WONDER mortality data updates roughly annually, so there is no real freshness benefit to querying live.
+    - Removes CDC WONDER uptime and rate limits as a failure point during a live demo or interview.
+  open_decision: The exact subset of states/causes/demographics for the static pull is not yet chosen. future_reporting_parameters below lists the full aspirational set; recommend narrowing to a small subset (for example 2-3 states, top 4-5 causes of death) for the first working version and expanding later if time allows.
+
+api_layer:
+  status: scaffolded_not_implemented
+  location: src/api/ (main.py, schemas.py)
+  decision: Build a small self-hosted API (FastAPI) that filters the static processed dataset and model outputs by state, sex, cause of death, age range, and year, rather than proxying live to CDC WONDER.
+  purpose: Serve subsection queries to the Streamlit dashboard and to the LLM reporting layer, so both consume the same filtered data instead of duplicating query logic.
+
+dashboard_strategy:
+  status: planned
+  primary:
+    tool: Streamlit
+    reason: Python-native, integrates directly with the API and the LLM reporting layer, deployable free with a live public link for the resume.
+    scope: Interactive subsection filters (state, sex, cause of death, age, year) plus an AI Insight panel powered by ai_reporting. Also absorbs step 1's originally-scoped mini dashboard (life expectancy/survival KPIs, year filter) instead of building that twice.
+  secondary:
+    tool: Power BI
+    reason: The tool actuaries and insurers actually use day to day; demonstrates industry fluency with DAX measures and executive-style KPI dashboards.
+    scope: Static dashboard built from precomputed model outputs (life expectancy trend, mortality improvement, kt forecast); shipped as screenshots/a short recording plus the .pbix file, not required to be live-hosted.
+  optional:
+    tool: Tableau
+    reason: Only worth building with time left over; skipping it entirely does not weaken the project.
+    scope: If built, a single Tableau Public viz, not a full app.
+
+ai_reporting:
+  status: planned
+  purpose: Generate plain-English commentary and reports for a user-selected subsection (state, sex, cause of death, age range, year), grounded in the project's own computed statistics rather than open-ended generation.
+  guardrail: The AI/report layer explains statistical outputs that already exist; it must not invent numbers or replace the mortality model. All AI-generated text is labeled "AI-generated interpretation - actuarial review required" per quality_bar.ai_review_gate.
+  pipeline:
+    - Compute the real statistics for the selected subsection in Python (percent change, trend direction, inflection years, which age bands drove the change).
+    - Retrieve relevant entries from a small curated context corpus (roughly 15-25 hand-written notes on known historical/epidemiological events, e.g. COVID-19 2020-2021, opioid epidemic 2015-2019, HIV/AIDS 1981-1995) by simple year-range and cause-tag matching; no vector database or embeddings needed at this corpus size.
+    - Assemble a prompt containing only the computed statistics and the matched context notes, instructing the model to narrate only the provided facts and to present retrieved context as known background, not as an independently asserted causal claim.
+    - Generate the commentary via LLM call, ideally as structured/typed output so it can be inserted programmatically into the dashboard or memo.
+    - Evaluate before display: check that any number the model states matches the computed ground truth.
+  classification_note: This is a lightweight retrieval-augmented generation (RAG) pipeline, using structured filtering over a small curated corpus rather than live web search or a vector index.
+  stretch_goal: Live web search for context beyond the curated corpus, only if time remains; not required for the core deliverable.
+
 active_parameters:
-  description: Parameters used by the current Excel-validation and first Python workflow.
+  description: Parameters used by the current baseline model prototype and first Python workflow.
   location:
     - United States
   sex:
@@ -154,7 +229,8 @@ active_parameters:
     - All causes
 
 future_reporting_parameters:
-  description: Later dashboard/report filters after the expanded datasets are cleaned and validated.
+  description: Later dashboard/API/report filters after the expanded datasets are cleaned and validated.
+  scope_note: Full aspirational set. See data_collection_strategy.open_decision for the recommendation to narrow this to a smaller subset for the first working version.
   locations:
     - United States
     - California
@@ -190,6 +266,14 @@ age_handling:
 
 quality_bar:
   description: Criteria for making the project strong enough for a prestigious actuarial/data science review.
+  engineering_hygiene:
+    requirement: The repo is usable and legible to an outside reviewer, not just runnable by the author.
+    status: gap
+    evidence_needed:
+      - Populated requirements.txt (currently empty).
+      - Populated README.md (currently empty) explaining what the project is, how to run it, and what is done versus planned.
+      - Unit tests for life table invariants and other pure-function logic (tests/ currently empty).
+      - Incremental, meaningfully-messaged git commit history rather than one large drop.
   end_to_end_run:
     requirement: The project runs from raw CDC WONDER data to final outputs with one command.
     status: planned
@@ -231,10 +315,13 @@ quality_bar:
     requirement: AI-generated interpretation is explicitly marked as requiring human actuarial review.
     status: planned
     required_language: AI-generated interpretation - actuarial review required before client or external use.
+    implementation_note: Enforced by ai_reporting.guardrail.
   validation_failure_mode:
     requirement: Validation includes at least one place where the model performs poorly and explains why.
     status: planned
-    candidate_failure_mode: Lee-Carter may perform poorly for young adult mortality affected by drug-induced deaths or external causes.
+    candidate_failure_modes:
+      - Lee-Carter may perform poorly for young adult mortality affected by drug-induced deaths or external causes.
+      - CDC WONDER suppression of small death counts can silently break the life table for a year/sex group if not explicitly handled; see data.known_data_quality_risk.
     evidence_needed:
       - Residual plot or error metric showing poor fit.
       - Plain-English diagnosis.
@@ -252,3 +339,4 @@ modeling:
 
 reporting:
   default_output: reports/mortality_model_report.md
+  ai_generated_commentary: See ai_reporting for the grounded/RAG pipeline that produces the subsection-level narrative used in both this report and the dashboard.
