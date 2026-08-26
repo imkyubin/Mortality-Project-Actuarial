@@ -84,6 +84,13 @@ corresponding `ai_reporting`, `api_layer`, and `dashboard_strategy` sections of 
 these — they specify constraints (e.g., the RAG pipeline is simple year-range/cause-tag corpus matching, not a
 vector DB) that aren't visible from the empty stub files alone.
 
+**`src/eda/` (planned, not yet created)** is deliberately separate from `src/visualization/`: EDA plots (missingness/
+suppression heatmap, crude pre-graduation mortality surface, mortality improvement rate, sex mortality gap, etc.)
+serve the analyst's own diagnostic understanding and are sequenced before the rest of step 2's modeling work, while
+`src/visualization/` is for polished, dashboard/export-ready output. Not every EDA plot belongs on the dashboard —
+see `workflow.step_2_modern_single_age_model.eda` in `config.yaml` for the full plot list and which ones are
+dashboard-facing versus internal-only.
+
 **`Phase1_Hands_On/` and `archive/`** hold an earlier Excel-based prototype (workbook + workflow doc) used only as
 a validation reference for spot-checking Python outputs against known-correct formulas — not part of the active
 pipeline.
