@@ -147,6 +147,21 @@ workflow:
       removed:
         - "plot_whittaker_residual: superseded by plot_cumulative_deviations, which answers the same is-this-slice-biased question more directly (the standard actuarial diagnostic, not just a raw residual scatter)."
       open_decision: Whether lambda_ is fixed across all year/sex groups in fit_wh_all or allowed to vary per group; current lean is fixed for simplicity, revisit after comparing plot_lambda_elbow results across a few different slices.
+    eda:
+      status: planned_next
+      location: src/eda/ (new module, not yet created)
+      sequencing_note: Logically belongs before whittaker_henderson_utility and before extracting lee_carter.py/poisson_lee_carter.py/forecasting.py, so modeling choices (how to handle suppressed cells, which validation_failure_mode to target) are grounded in documented findings rather than ad hoc inspection. Built after whittaker_henderson_utility in practice; sequence it first for the remaining step 2 work.
+      distinction_from_visualization: Deliberately kept separate from src/visualization/ (dashboard/export-ready plots). EDA here serves the analyst's own diagnostic understanding and is not necessarily end-user-facing.
+      planned_plots:
+        - "Missingness/suppression heatmap (Year x Age, faceted by sex): flags where Deaths/Population came back NaN after pd.to_numeric(errors='coerce'). Do this one first — directly targets data.known_data_quality_risk before any modeling trusts the life table recursion, since one suppressed cell can silently corrupt an entire year/sex group's lx via the cumulative product."
+        - "Crude (pre-graduation) ln(qx) mortality surface heatmap, Year x Age: the raw-data precursor to whittaker_henderson.py's plot_whittaker_residual_heatmap; reveals period effects (e.g. COVID 2020-2021 as a horizontal band across ages) before any fitting."
+        - "ln(qx) vs age, one line per year or decade: the classic mortality curve; already partly specified in step 1's life_table_build.visualization_outputs."
+        - "Survival curve (lx/radix) by age for a representative year/sex."
+        - "Life expectancy (ex) trend over time by sex: the headline actuarial KPI."
+        - "Mortality improvement rate (year-over-year percent change in qx/mx by age): sets up quality_bar.validation_failure_mode's young-adult/drug-induced-deaths story with evidence rather than assertion."
+        - "Sex mortality gap: male vs female qx or ex by age, a well-documented actuarial pattern worth confirming in this dataset."
+      dashboard_facing: Life expectancy trend by sex, survival curve, qx-by-age curve, mortality improvement summary, and sex mortality gap are candidates for dashboard_strategy panels — interpretable to a general viewer under the year/sex/age filters.
+      internal_only: The missingness/suppression heatmap and raw death-count distributions belong in the analyst's own workflow and the actuarial_memo's limitations section, not as live dashboard panels. The crude mortality surface and any full residual heatmaps are model-diagnostic tools, not headline dashboard content.
 
   step_3_holistic_harmonized_model:
     status: planned_after_step_2

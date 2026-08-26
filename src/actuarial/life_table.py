@@ -1,6 +1,6 @@
 import numpy as np
 
-def add_life_tab_col(df, RADIX):
+def add_life_tab_col(df, RADIX=100000):
     validation_df = df.copy()
     if "Single-Year Ages Code" in validation_df.columns:
         validation_df["qx"] = validation_df["Deaths"]/validation_df["Population"]
