@@ -2,6 +2,12 @@ import numpy as np
 
 from src.actuarial.load_filter import load_filter
 from src.actuarial.life_table import add_life_tab_col
+from src.actuarial.eda import (
+    plot_crude_mortality_surface,
+    plot_progression_eda,
+    plot_top_ex,
+    plot_pct_heatmap
+)
 from src.actuarial.whittaker_henderson import (
     lambda_metrics,
     plot_lambda_elbow,
@@ -11,7 +17,6 @@ from src.actuarial.whittaker_henderson import (
     wh_worst_cumdev,
     plot_3worst_fit
 )
-    
 
 # Load Datasets and Create New Life Table Columns
 single_age_df = load_filter(
@@ -32,8 +37,47 @@ single_age_life_table = add_life_tab_col(single_age_df)
 
 grouple_age_life_table = add_life_tab_col(group_age_df)
 
-# EDA
+# EDA (Single Age)
+plot_crude_mortality_surface(single_age_life_table, 'T')
+plot_crude_mortality_surface(single_age_life_table, 'M')
+plot_crude_mortality_surface(single_age_life_table, 'F')
 
+plot_progression_eda(single_age_life_table, 'T', column='ln_qx', start_year=None, gaps=5)
+plot_progression_eda(single_age_life_table, 'M', column='ln_qx', start_year=None, gaps=5)
+plot_progression_eda(single_age_life_table, 'F', column='ln_qx', start_year=None, gaps=5)
+
+plot_progression_eda(single_age_life_table, 'T', column='Cumulative Survival', start_year=None, gaps=5)
+plot_progression_eda(single_age_life_table, 'M', column='Cumulative Survival', start_year=None, gaps=5)
+plot_progression_eda(single_age_life_table, 'F', column='Cumulative Survival', start_year=None, gaps=5)
+
+plot_top_ex(single_age_life_table, 'T', plot_n=3)
+plot_top_ex(single_age_life_table, 'M', plot_n=3)
+plot_top_ex(single_age_life_table, 'F', plot_n=3)
+
+plot_pct_heatmap(single_age_life_table, 'T')
+plot_pct_heatmap(single_age_life_table, 'M')
+plot_pct_heatmap(single_age_life_table, 'F')
+
+# EDA (Age Group)
+plot_crude_mortality_surface(grouple_age_life_table, 'T')
+plot_crude_mortality_surface(grouple_age_life_table, 'M')
+plot_crude_mortality_surface(grouple_age_life_table, 'F')
+
+plot_progression_eda(grouple_age_life_table, 'T', column='ln_qx', start_year=None, gaps=5)
+plot_progression_eda(grouple_age_life_table, 'M', column='ln_qx', start_year=None, gaps=5)
+plot_progression_eda(grouple_age_life_table, 'F', column='ln_qx', start_year=None, gaps=5)
+
+plot_progression_eda(grouple_age_life_table, 'T', column='Cumulative Survival', start_year=None, gaps=5)
+plot_progression_eda(grouple_age_life_table, 'M', column='Cumulative Survival', start_year=None, gaps=5)
+plot_progression_eda(grouple_age_life_table, 'F', column='Cumulative Survival', start_year=None, gaps=5)
+
+plot_top_ex(grouple_age_life_table, 'T', plot_n=3)
+plot_top_ex(grouple_age_life_table, 'M', plot_n=3)
+plot_top_ex(grouple_age_life_table, 'F', plot_n=3)
+
+plot_pct_heatmap(grouple_age_life_table, 'T')
+plot_pct_heatmap(grouple_age_life_table, 'M')
+plot_pct_heatmap(grouple_age_life_table, 'F')
 
 # Whittaker Henderson Graduation (Single Age)
 lambda_df = lambda_metrics(
@@ -56,3 +100,6 @@ plot_3worst_fit(top_rss_df, whittaker_df)
 top_cumdev_df = wh_worst_cumdev(whittaker_df)
 print(top_cumdev_df)
 plot_3worst_fit(top_cumdev_df, whittaker_df)
+
+# Lee Carter dfs and Outputs
+

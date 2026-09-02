@@ -108,7 +108,8 @@ workflow:
         - Convert forecast kt back to forecast mortality rates.
 
   step_2_modern_single_age_model:
-    status: planned_next
+    status: in_progress
+    status_note: whittaker_henderson_utility below is done and eda is in progress; the headline models below (lee_carter, poisson_lee_carter) are the active next task and still stub files in src/actuarial/.
     description: The primary, production-quality mortality model. Unlike step 1's deliberately exhaustive prototype toolbox, step 2 intentionally uses only the small set of models an actuary would actually rely on in practice, fit on the full modern single-age dataset.
     input_source: data/processed/new_1999_2024.csv
     source_dataset: modern_single_age_file
@@ -130,38 +131,42 @@ workflow:
     validation:
       lee_carter_benchmark: Compare ax, bx, and kt against the Human Mortality Database US Lee-Carter output or an equivalent published benchmark; document data differences and define a tolerance before comparing. See quality_bar.lee_carter_benchmark.
       kt_uncertainty: Random walk with drift; forecast intervals must widen with horizon. See quality_bar.kt_uncertainty.
+      out_of_sample_backtest: Fit on a training window (e.g., 1999-2018), forecast kt forward, convert to forecast mortality rates, and compare against actual observed rates in the holdout years (2019-2024). See quality_bar.out_of_sample_backtest.
     use_case: Primary detailed age-specific mortality modeling and forecasting; the model that the dashboard, API, and LLM reporting layers read from.
     whittaker_henderson_utility:
-      status: in_progress
+      status: done
       location: src/actuarial/whittaker_henderson.py
       purpose: Reusable Whittaker-Henderson graduation/smoothing utility per model_selection_rationale above (not the step 2 headline model). Extends step 1's single hand-picked year/sex slice into a fit across every year/sex group in the full modern dataset.
-      known_issue: Line 5 import currently reads `import matplotlib.colors import TwoSlopeNorm` (invalid syntax); must be corrected to `from matplotlib.colors import TwoSlopeNorm` before anything else in the file will run.
-      build_order:
-        - "_second_difference_matrix(n): unchanged helper, reused directly by fit_whittaker_henderson and again by the lambda elbow plot's smoothness term."
-        - "fit_whittaker_henderson(df, year, sex_code, lambda_, pop_weights): unchanged single year/sex fit ported from scripts/step1_baseline_model_prototype.py; the shared building block every function below calls."
-        - "fit_wh_all(df, lambda_, pop_weights): new. Loops fit_whittaker_henderson over every Year Code / Sex Code group in df and concatenates results into one long-format frame; step 2's actual entry point, feeds both the residual heatmap and the cumulative deviations plot."
-        - "plot_lambda_elbow(df, year, sex_code, lambda_grid, pop_weights): new. Runs fit_whittaker_henderson once per lambda_ in a grid for one representative slice, plots Smoothness (roughness penalty via _second_difference_matrix) against Fit (weighted residual sum of squares); the elbow informs the lambda_ default, so build before finalizing fit_wh_all's default."
-        - "plot_whittaker_residual_heatmap(whittaker_df, sex_code): new. Takes fit_wh_all's output, pivots Year Code by Single-Year Ages Code with whittaker_residual as values, one call per sex, diverging colormap via TwoSlopeNorm centered at 0. Decided replacement for a per-slice residual line plot across the full 1999-2024 range."
-        - "plot_cumulative_deviations(whittaker_df): new, replaces plot_whittaker_residual (removed). Cumulative sum of whittaker_residual by age within one slice; a curve drifting away from zero reveals systematic bias, the actuarial cumulative-deviations test made visual, and a stronger diagnostic than a raw residual line."
-        - "plot_whittaker_fit(whittaker_df): unchanged, kept for spot-checking one slice's fitted curve shape; not superseded by anything above."
+      function_list:
+        - "_second_difference_matrix(n): roughness-penalty matrix, reused by fit_whittaker_henderson and by the lambda elbow's smoothness term."
+        - "fit_whittaker_henderson(df, year, sex_code, lambda_=1, pop_weights='n'): single year/sex fit; the shared building block everything else calls. pop_weights uses population SHARE (Population/Population.sum() within that slice), not raw population counts, so lambda_'s effective meaning doesn't swing wildly between pop_weights='n' and population-weighted."
+        - "fit_wh_all(df, lambda_=1, pop_weights='n'): fits every (Year Code, Sex Code) group and concatenates into one long frame; the actual step 2 entry point."
+        - "lambda_metrics(df, lambda_grid, pop_weights='n') / plot_lambda_elbow(lambda_df): sweeps lambda_grid across the whole dataset (not one slice) via fit_wh_all, builds a (Lambda, RSS, Smoothness) table, plots the elbow with each point labeled by lambda. RSS is also population-share weighted for the same reason as above."
+        - "wh_heatmap(df, sex_code): Year x Age residual heatmap, one call per sex, TwoSlopeNorm(vcenter=0) + diverging colormap. Replaces a per-slice residual line plot across the full 1999-2024 range."
+        - "plot_whittaker_fit(whittaker_df): single-slice observed-vs-fitted curve; kept for spot-checking one fit's actual shape."
+        - "wh_worst_fit(whittaker_df, n=10, pop_weights='n') / wh_worst_cumdev(whittaker_df, n=10, pop_weights='n'): rank every (Year Code, Sex Code) group by population-share-weighted RSS or by max absolute cumulative deviation, returning the top n as a ranking table. plot_3worst_fit(top_df, whittaker_df, top_k=3) plots the top top_k of whichever ranking table it's given, reusing plot_whittaker_fit per slice."
+      superseded_plan:
+        - "The originally-planned single-slice plot_cumulative_deviations was never built. Once it became clear manually picking one slice at a time didn't scale to the full dataset, it was replaced by the wh_worst_fit/wh_worst_cumdev ranking layer plus plot_3worst_fit, which automatically selects and plots the worst-fit/most-biased slices instead."
       removed:
-        - "plot_whittaker_residual: superseded by plot_cumulative_deviations, which answers the same is-this-slice-biased question more directly (the standard actuarial diagnostic, not just a raw residual scatter)."
-      open_decision: Whether lambda_ is fixed across all year/sex groups in fit_wh_all or allowed to vary per group; current lean is fixed for simplicity, revisit after comparing plot_lambda_elbow results across a few different slices.
+        - "plot_whittaker_residual: superseded by the wh_worst_cumdev ranking (directional bias, automatically applied to the worst offenders) rather than a raw single-slice residual scatter."
+      resolved_decisions:
+        - "Whether lambda_ is fixed across all year/sex groups or allowed to vary per group: resolved as fixed/global — lambda_metrics/plot_lambda_elbow deliberately fit the whole dataset at each candidate lambda_ rather than per-slice, matching how a real graduation table uses one smoothing constant per basis, not one per subgroup."
+        - "Population-weight scaling: resolved by normalizing to population share (divide by that slice's own Population.sum()) everywhere pop_weights is used — in the fit itself and in the ranking metrics — rather than raw population counts, which would otherwise both distort cross-group rankings toward high-population groups and change lambda_'s effective meaning depending on pop_weights."
+      next_up: scripts/step2_all_dataset_model.py wires this module (and the eda module below) together end to end and is the working reference for how these functions compose. The active next task after this is extracting lee_carter.py and poisson_lee_carter.py (see models above) — both are still stub files.
     eda:
-      status: planned_next
-      location: src/eda/ (new module, not yet created)
-      sequencing_note: Logically belongs before whittaker_henderson_utility and before extracting lee_carter.py/poisson_lee_carter.py/forecasting.py, so modeling choices (how to handle suppressed cells, which validation_failure_mode to target) are grounded in documented findings rather than ad hoc inspection. Built after whittaker_henderson_utility in practice; sequence it first for the remaining step 2 work.
+      status: in_progress
+      location: src/actuarial/eda.py (planned location was src/eda/; ended up colocated with the other actuarial modules since it needs the same life-table columns)
       distinction_from_visualization: Deliberately kept separate from src/visualization/ (dashboard/export-ready plots). EDA here serves the analyst's own diagnostic understanding and is not necessarily end-user-facing.
-      planned_plots:
-        - "Missingness/suppression heatmap (Year x Age, faceted by sex): flags where Deaths/Population came back NaN after pd.to_numeric(errors='coerce'). Do this one first — directly targets data.known_data_quality_risk before any modeling trusts the life table recursion, since one suppressed cell can silently corrupt an entire year/sex group's lx via the cumulative product."
-        - "Crude (pre-graduation) ln(qx) mortality surface heatmap, Year x Age: the raw-data precursor to whittaker_henderson.py's plot_whittaker_residual_heatmap; reveals period effects (e.g. COVID 2020-2021 as a horizontal band across ages) before any fitting."
-        - "ln(qx) vs age, one line per year or decade: the classic mortality curve; already partly specified in step 1's life_table_build.visualization_outputs."
-        - "Survival curve (lx/radix) by age for a representative year/sex."
-        - "Life expectancy (ex) trend over time by sex: the headline actuarial KPI."
-        - "Mortality improvement rate (year-over-year percent change in qx/mx by age): sets up quality_bar.validation_failure_mode's young-adult/drug-induced-deaths story with evidence rather than assertion."
+      built:
+        - "plot_crude_mortality_surface(df, sex_code): raw (pre-graduation) ln(qx) mortality surface, Year x Age, sequential (not diverging) colormap since ln(qx) has no meaningful zero to center on."
+        - "plot_progression_eda(df, sex_code, column, start_year=None, gaps=1): mortality curve (column='ln_qx') or survival curve (column='Cumulative Survival') by age, one line per year (thinned via start_year/gaps); handles both single-year and harmonized age bases."
+        - "top_n_ex(df, sex_code, df_n=5) / plot_top_ex(df, sex_code, plot_n=3): ranks ages by the slope of their life-expectancy trend over time (np.polyfit), returns/plots the most-improving and most-declining ages automatically rather than requiring a manually picked age."
+        - "pct_change_qx(df, sex_code) / plot_pct_heatmap(df, sex_code): year-over-year percent mortality-improvement rate (sign-flipped so positive means improving), pivoted Year x Age, TwoSlopeNorm(vcenter=0) + diverging colormap since improvement is genuinely a positive/negative quantity."
+      not_yet_built:
+        - "Missingness/suppression heatmap (Year x Age, faceted by sex): flags where Deaths/Population came back NaN after pd.to_numeric(errors='coerce'). Recommended to build first — directly targets data.known_data_quality_risk before any modeling trusts the life table recursion, since one suppressed cell can silently corrupt an entire year/sex group's lx via the cumulative product. Still outstanding; the other plots were built ahead of it in practice."
         - "Sex mortality gap: male vs female qx or ex by age, a well-documented actuarial pattern worth confirming in this dataset."
-      dashboard_facing: Life expectancy trend by sex, survival curve, qx-by-age curve, mortality improvement summary, and sex mortality gap are candidates for dashboard_strategy panels — interpretable to a general viewer under the year/sex/age filters.
-      internal_only: The missingness/suppression heatmap and raw death-count distributions belong in the analyst's own workflow and the actuarial_memo's limitations section, not as live dashboard panels. The crude mortality surface and any full residual heatmaps are model-diagnostic tools, not headline dashboard content.
+      dashboard_facing: Life expectancy trend (top_n_ex/plot_top_ex), survival curve and mortality curve (plot_progression_eda), and the mortality improvement heatmap are candidates for dashboard_strategy panels — interpretable to a general viewer under the year/sex/age filters.
+      internal_only: The missingness/suppression heatmap (once built) and raw death-count distributions belong in the analyst's own workflow and the actuarial_memo's limitations section, not as live dashboard panels. plot_crude_mortality_surface and wh_heatmap-style residual heatmaps are model-diagnostic tools, not headline dashboard content.
 
   step_3_holistic_harmonized_model:
     status: planned_after_step_2
@@ -315,6 +320,14 @@ quality_bar:
       - Symmetric intervals around forecast kt.
       - Intervals widen with forecast horizon.
       - Formula documented in forecasting module or report.
+  out_of_sample_backtest:
+    requirement: The model's forecast is validated against real holdout data, not just in-sample fit diagnostics.
+    status: planned
+    method: Fit Lee-Carter/Poisson Lee-Carter on a training window (e.g., 1999-2018), forecast kt forward via random walk with drift, convert to forecast mortality rates, and compare against actual observed mortality in the holdout years (2019-2024).
+    evidence_needed:
+      - Plot or table of forecasted vs actual mx (or ex) for the holdout years, by age and/or sex.
+      - Explicit discussion of where the forecast diverges from actual (e.g., COVID-19 2020-2021 should show a real, expected divergence, not be treated as a bug to fix).
+      - Feeds validation_failure_mode as one of the concrete documented failure modes.
   actuarial_memo:
     requirement: At least one output is formatted as a one-page actuarial-style memo.
     status: planned
