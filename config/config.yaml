@@ -109,7 +109,7 @@ workflow:
 
   step_2_modern_single_age_model:
     status: in_progress
-    status_note: whittaker_henderson_utility below is done and eda is in progress; the headline models below (lee_carter, poisson_lee_carter) are the active next task and still stub files in src/actuarial/.
+    status_note: whittaker_henderson_utility below is done and eda is in progress; lee_carter_utility below (SVD-based fit, fit diagnostics, A/E validation, historical e-at-age comparison) is in progress. poisson_lee_carter.py and forecasting.py are still stub files.
     description: The primary, production-quality mortality model. Unlike step 1's deliberately exhaustive prototype toolbox, step 2 intentionally uses only the small set of models an actuary would actually rely on in practice, fit on the full modern single-age dataset.
     input_source: data/processed/new_1999_2024.csv
     source_dataset: modern_single_age_file
@@ -152,7 +152,26 @@ workflow:
       resolved_decisions:
         - "Whether lambda_ is fixed across all year/sex groups or allowed to vary per group: resolved as fixed/global — lambda_metrics/plot_lambda_elbow deliberately fit the whole dataset at each candidate lambda_ rather than per-slice, matching how a real graduation table uses one smoothing constant per basis, not one per subgroup."
         - "Population-weight scaling: resolved by normalizing to population share (divide by that slice's own Population.sum()) everywhere pop_weights is used — in the fit itself and in the ranking metrics — rather than raw population counts, which would otherwise both distort cross-group rankings toward high-population groups and change lambda_'s effective meaning depending on pop_weights."
-      next_up: scripts/step2_all_dataset_model.py wires this module (and the eda module below) together end to end and is the working reference for how these functions compose. The active next task after this is extracting lee_carter.py and poisson_lee_carter.py (see models above) — both are still stub files.
+      next_up: scripts/step2_all_dataset_model.py wires this module (and the eda module below) together end to end and is the working reference for how these functions compose.
+    lee_carter_utility:
+      status: in_progress
+      location: src/actuarial/lee_carter.py
+      purpose: SVD-based Lee-Carter fit (ln(mx) = ax + bx*kt), fit diagnostics, and an Actual/Expected (A/E) validation layer against the fitted mx surface. This is the working, non-forecasting half of the step 2 headline model; poisson_lee_carter.py (the Newton-Raphson MLE refinement) and forecasting.py remain stub files.
+      function_list:
+        - "lc_matrix(df, sex_code): pivots ln(qx) into a Year x Age matrix for one sex; the shared input to fit_lee_carter and lc_variance_explained."
+        - "fit_lee_carter(matrix): SVD-based ax/bx/kt fit; ax is the per-age mean, bx/kt come from the first singular vector/value pair, rescaled so bx sums to 1."
+        - "reconstruct_lc(ax, bx, kt): rebuilds the fitted ln(mx) surface from the fitted parameters."
+        - "build_lc_tables(...) / fit_lc_all(df): wraps the fit per Sex Code group into long age/year/fitted tables across the whole dataset; the actual step 2 entry point."
+        - "plot_lc_parameters(age_all, year_all): fit sanity-check — ax and bx vs age, kt vs year, one figure per parameter per sex. Placed immediately after fit_lc_all in the module, ahead of the A/E functions below, since those numbers shouldn't be trusted until this has been reviewed."
+        - "lc_variance_explained(matrix): reruns the SVD on the same centered matrix fit_lee_carter uses and returns per-component variance-explained (S**2/sum(S**2)) plus cumulative variance, to check how much the single-component Lee-Carter approximation is actually capturing."
+        - "ae_metric(df, fitted_all): merges fitted_all onto df to compute Expected Deaths (Population * fitted_mx), AE Ratio, and AE Deviation."
+        - "ae_heatmap(ae_df): Year x Age heatmap of (AE Ratio - 1) per sex, TwoSlopeNorm(vcenter=0) + RdBu_r, reusing the wh_heatmap diagnostic pattern above."
+        - "ae_summary(ae_df): prints population-aggregated AE Ratio per Year/Sex (sums Deaths and Expected Deaths separately before dividing, rather than averaging per-cell ratios)."
+        - "ex_progression_plot(single_age_life_table, ae_df, age=65): builds a life table off the fitted Expected Deaths via add_life_tab_col (src/actuarial/life_table.py), then plots fitted ex against actual ex at a given age, one figure per sex; the historical (non-forecast) e-at-age comparison."
+      not_yet_built:
+        - "Newton-Raphson-calibrated Poisson Lee-Carter kt: a prior session reportedly built this, but it does not exist in this repo or its git history — it was lost in an unsaved session. Treat as not yet done."
+        - "forecasting.py (kt drift/forecast, fan charts): depends on either the SVD-based or Poisson-calibrated kt being treated as final first."
+      next_up: poisson_lee_carter.py is still an empty stub; forecasting.py follows once one of the two kt fits is treated as primary.
     eda:
       status: in_progress
       location: src/actuarial/eda.py (planned location was src/eda/; ended up colocated with the other actuarial modules since it needs the same life-table columns)

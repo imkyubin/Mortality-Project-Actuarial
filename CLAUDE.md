@@ -60,11 +60,12 @@ is: `qx = Deaths/Population` → `px = 1-qx` → recursive cohort survivors `lx`
 per `Year Code`/`Sex Code` group, walked in increasing age order) → `dx = qx*lx` → `Lx = lx - 0.5*dx` → `Tx`
 (reverse-cumulative sum of `Lx` within each year/sex group) → `ex = Tx/lx`. Rows **must** be sorted by
 year, sex, then increasing age before calling this (see `src/actuarial/load_filter.py:load_filter`), since the
-`lx`/`Tx` recursions rely on row order, not on the age values themselves. `lee_carter.py` and `poisson_lee_carter.py`
-are still stub files — **this is the active next task**: extract the reference implementation out of
-`scripts/step1_baseline_model_prototype.py` into real, dataset-wide fits (see
-`workflow.step_2_modern_single_age_model.models` in `config.yaml`); `forecasting.py` follows after those two are
-done. Whichever model is treated as primary, validation must include an out-of-sample backtest — fit on a training
+`lx`/`Tx` recursions rely on row order, not on the age values themselves. `lee_carter.py` now has a working
+SVD-based fit, fit diagnostics, and an Actual/Expected (A/E) validation layer (see the dedicated section below);
+`poisson_lee_carter.py` is still an empty stub — extracting/fitting the Newton-Raphson-calibrated Poisson MLE `kt`
+(see `workflow.step_2_modern_single_age_model.lee_carter_utility` in `config.yaml`) is the active next task there.
+`forecasting.py` follows once one of the two `kt` fits is treated as primary. Whichever model is treated as primary,
+validation must include an out-of-sample backtest — fit on a training
 window, forecast `kt` forward, and compare the forecast against actual holdout years — not just in-sample fit
 diagnostics; see `quality_bar.out_of_sample_backtest` in `config.yaml`. `whittaker_henderson.py` is complete: a working graduation-diagnostics module (fit every year/sex group at a
 given lambda, a dataset-wide lambda elbow search, a residual heatmap, and an automatic worst-fit/worst-bias
@@ -135,50 +136,52 @@ reference for how these functions compose.
 
 ## Lee-Carter / Poisson Lee-Carter — current state and planned visualizations
 
-`src/actuarial/lee_carter.py` (SVD-based fit) currently has `lc_matrix` (returns `matrix, ages, years`
-only — the `Deaths`/`Population` pivot matrices were dropped from it since nothing consumed them;
-`ae_metric` re-derives Actual/Expected by merging back onto the source `df` instead of threading arrays
-through), `fit_lee_carter`, `reconstruct_lc`, `build_lc_tables`, `fit_lc_all`, `ae_metric` (done), and a
-first-draft `ae_heatmap` (currently broken — see below). `src/actuarial/poisson_lee_carter.py` is still
-an empty import-only stub.
+`src/actuarial/lee_carter.py` (SVD-based fit) is now built out through the full non-forecasting A/E and
+e-at-age workflow; also recorded in `config.yaml` `workflow.step_2_modern_single_age_model.lee_carter_utility`.
+`src/actuarial/poisson_lee_carter.py` is still an empty import-only stub.
 
 A prior session reportedly added a Newton-Raphson-calibrated `kt` (the standard Brouhns/Denuit/Vermunt
 Poisson Lee-Carter MLE fit, which has no closed-form SVD solution and is solved iteratively) — none of
 that exists in this repo or its git history as of 2026-08-28 (verified via `git diff`/`git stash list`,
 both showed nothing matching); it was lost in an unsaved session. Treat it as **not yet done** rather
-than assume it exists. (The A/E metric and e65 progression view from that same lost session are being
-rebuilt now — see below — independent of whether the Poisson `kt` fit ever gets redone, since both work
-fine off the existing SVD-based `kt`.)
+than assume it exists. (The A/E metric and e-at-age progression view from that same lost session have
+since been rebuilt from scratch — see the function list below — independent of whether the Poisson `kt`
+fit ever gets redone, since both work fine off the existing SVD-based `kt`.)
 
-### A/E and e65 workflow (non-forecasting), in dependency order
+Function list, in the order they appear in the file (fit pipeline → fit diagnostics → A/E workflow →
+e-at-age comparison):
 
+- `lc_matrix(df, sex_code)` — pivots `ln(qx)` into a Year × Age matrix for one sex; returns `matrix, ages,
+  years` only (the `Deaths`/`Population` pivot matrices were dropped since nothing consumed them). Shared
+  input to `fit_lee_carter` and `lc_variance_explained`.
+- `fit_lee_carter(matrix)` / `reconstruct_lc(ax, bx, kt)` / `build_lc_tables(...)` / `fit_lc_all(df)` —
+  the core SVD-based `ax`/`bx`/`kt` fit, wrapped per `Sex Code` group into long age/year/fitted tables
+  across the whole dataset; `fit_lc_all` is the actual step 2 entry point.
+- `plot_lc_parameters(age_all, year_all)` — **done**. Fit sanity-check: `ax` and `bx` vs age, `kt` vs
+  year, one figure per parameter per sex (loops over every `Sex Code` in `age_all` itself, so it always
+  plots all sexes — there is no `sex_code` filter argument). Deliberately placed right after `fit_lc_all`
+  in the module, ahead of the A/E functions below, since those numbers shouldn't be trusted until this has
+  been reviewed.
+- `lc_variance_explained(matrix)` — **done**. Recenters `matrix` the same way `fit_lee_carter` does, reruns
+  the SVD to get the full singular-value array `S` (rather than having `fit_lee_carter` return it, which
+  would have touched `fit_lc_all`'s call site), and returns a `(Component, Variance Explained, Cumulative
+  Variance)` table via `S**2 / sum(S**2)` — checks how much the single-component Lee-Carter approximation
+  is actually capturing.
 - `ae_metric(df, fitted_all)` — **done**. Merges `fit_lc_all`'s `fitted_all` onto `df` (renaming
   `age`/`year` to `Single-Year Ages Code`/`Year Code` first) to compute `Expected Deaths = Population *
   fitted_mx`, `AE Ratio = Deaths / Expected Deaths`, `AE Deviation = Deaths - Expected Deaths`.
-- `ae_heatmap(ae_df)` — **drafted but broken**. Inside the per-`Sex Code` loop it computes
-  `df_filtered['AE Scaled']` but then calls `df_model.pivot_table(..., values="AE Scaled", ...)` on the
-  *unfiltered* frame, which never gets that column — raises `KeyError: 'AE Scaled'` (confirmed by running
-  it against synthetic data on 2026-09-01). Fix: pivot `df_filtered`, not `df_model`; also assign
-  `'AE Scaled'` via an explicit `.copy()` of the filtered slice to avoid the chained-assignment warning.
-  Once fixed: Year × Age heatmap of `AE Ratio - 1` per sex, reusing `wh_heatmap`'s `TwoSlopeNorm(vcenter=0)`
-  + `RdBu_r` pattern — this is the QA/diagnostic view, not the report-facing number (that's `ae_summary`).
-- `ae_summary(ae_df, bins=None)` — **not started**. Group by `Year Code`/`Sex Code` (and age band if
-  `bins` given), sum `Deaths` and `Expected Deaths` separately before dividing — summing first (rather than
-  averaging per-cell ratios) avoids small-exposure ages/years dominating the aggregate.
-- `e65_progression(df, fitted_all, sex_code, age=65)` — **not started**. Build a life table off the fitted
-  mx surface via `add_life_tab_col` (from `life_table.py`) and compare `ex` at `age` against the actual
-  (unsmoothed) `ex` already in `df`, merged into one frame keyed by `Year Code`. Must sort by
-  `Year Code`/`Single-Year Ages Code` first — `add_life_tab_col`'s `lx`/`Tx` recursion depends on row
-  order, not on age values.
-- `plot_e65_progression(e65_df, sex_code, age=65)` — **not started**. `actual_ex` vs `fitted_ex` line plot
-  over `Year Code`; historical comparison only, distinct from the forecast e65 fan chart below.
-- `plot_lc_parameters(age_all, year_all, sex_code)` — **not started**. Sanity-check plot for the fit
-  itself, currently missing entirely: `ax`/`bx` vs age (from `age_all`), `kt` vs year (from `year_all`),
-  filtered to one sex. Should exist before trusting A/E or e65 numbers derived from the fit.
-- `lc_variance_explained(matrix)` — **not started**. Needs the full SVD singular-value array `S`, which
-  `fit_lee_carter` currently discards past `S[0]`. Decide whether `fit_lee_carter` should return `S` too,
-  or whether this function reruns the SVD itself on `matrix`, before implementing — either choice touches
-  `fit_lc_all`'s call site.
+- `ae_heatmap(ae_df)` — **done**. Year × Age heatmap of `AE Ratio - 1` per sex, reusing `wh_heatmap`'s
+  `TwoSlopeNorm(vcenter=0)` + `RdBu_r` pattern — the QA/diagnostic view, not the report-facing number
+  (that's `ae_summary`).
+- `ae_summary(ae_df)` — **done**, simpler than originally planned: groups by `Year Code`/`Sex Code` only
+  (no age-band `bins` parameter yet) and `print`s the result rather than returning a DataFrame. Sums
+  `Deaths` and `Expected Deaths` separately before dividing — summing first (rather than averaging
+  per-cell ratios) avoids small-exposure ages/years dominating the aggregate.
+- `ex_progression_plot(single_age_life_table, ae_df, age=65)` — **done**, combining what was originally
+  planned as two separate functions (`e65_progression` to build the comparison frame, `plot_e65_progression`
+  to plot it) into one: derives a fitted life table from `ae_df`'s `Expected Deaths` via `add_life_tab_col`
+  (`life_table.py`), then plots fitted `ex` against the actual (unsmoothed) `ex` at `age` for every sex in
+  the data, one figure per sex. Historical comparison only, distinct from the forecast e65 fan chart below.
 
 Planned visualization roadmap once the Poisson Lee-Carter fit exists, in rough priority order:
 - **kt trajectory + forecast fan chart** — historical calibrated `kt` plus forecast with widening
@@ -186,7 +189,7 @@ Planned visualization roadmap once the Poisson Lee-Carter fit exists, in rough p
   un-ported starting point, destined for `src/actuarial/forecasting.py` (currently empty).
 - **e65 (or e0) fan chart** — life expectancy forecast propagated from the kt fan chart; this is the
   number that actually gets presented to a non-technical audience. (Distinct from the historical
-  `e65_progression` above.)
+  `ex_progression_plot` above.)
 - **Cumulative A/E deviation over time** — same spirit as `wh_worst_cumdev`, checking whether the
   Poisson-calibrated model systematically over/under-predicts deaths moving away from the fit window.
 - **Out-of-sample backtest plot** — forecast vs. actual mx/ex for held-out years, required by
