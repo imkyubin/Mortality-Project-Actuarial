@@ -3,6 +3,7 @@
 from src.data.cleaning import (
     combine_datasets,
     filter_by_sex,
+    flag_suppressed,
     NEW_COLUMNS,
     OLD_COLUMNS,
     remove_grand_totals,
@@ -53,6 +54,9 @@ if __name__ == "__main__":
     new_wonder = combine_datasets(
         [wonder_1999_2020, wonder_2021_2024]
     )
+
+    old_wonder = flag_suppressed(old_wonder)
+    new_wonder = flag_suppressed(new_wonder)
 
     print("old_wonder:", old_wonder.shape)
     print("old_male:", filter_by_sex(old_wonder, "Sex Code", "M").shape)

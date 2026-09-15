@@ -80,11 +80,15 @@ given lambda, a dataset-wide lambda elbow search, a residual heatmap, and an aut
 ranking-and-plot layer) — see `workflow.step_2_modern_single_age_model.whittaker_henderson_utility` in `config.yaml`
 for the current function list.
 
-**Known data-quality trap**: CDC WONDER suppresses death counts under 10 as non-numeric placeholder text. Cleaning
-currently uses `pd.to_numeric(errors="coerce")`, which silently turns suppressed cells into `NaN` — this can
-propagate through the recursive `lx` calculation and corrupt an entire year/sex group's life table. This is not
-yet explicitly detected or handled (`data.known_data_quality_risk` in `config.yaml`); be careful when adding logic
-that assumes `Deaths`/`Population` are always clean numerics.
+**Known data-quality trap**: CDC WONDER suppresses death counts under 10 as the literal string `"Suppressed"`.
+`src/data/cleaning.py:flag_suppressed` now flags this explicitly (adds a `{column} Suppressed` boolean column)
+*before* `pd.to_numeric(errors="coerce")` turns it into an indistinguishable `NaN` — wired into
+`scripts/data_cleaning_exploration.py` right after `combine_datasets`, so both processed files carry the flag.
+It's a no-op today (national all-cause single-age counts don't hit the under-10 threshold), but it matters once
+the state/cause/race pull below lands, since those combinations will suppress routinely. See
+`data.known_data_quality_risk` in `config.yaml` for a related unfixed gap in `harmonization.py`'s `aggregate()`
+(plain `Deaths` sum, no suppression propagation) that isn't triggered yet but would need fixing before that
+function ever sees suppressible data.
 
 **Downstream layers are scaffolded but not implemented**: `src/api/` (FastAPI, meant to filter processed data/model
 outputs by cause, age range, sex, location, year for the dashboard and reporting layer), `src/reporting/` (grounded

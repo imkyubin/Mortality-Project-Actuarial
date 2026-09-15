@@ -60,5 +60,18 @@ def fill_na_T(df, sex_column):
 def select_columns(df, columns):
     return df[columns].copy()
 
+def flag_suppressed(df, columns=("Deaths", "Population")):
+    """Flag CDC WONDER's 'Suppressed' placeholder (counts under 10) before
+    numeric coercion turns it into an indistinguishable NaN.
+    """
+    flagged_df = df.copy()
+
+    for column in columns:
+        flagged_df[f"{column} Suppressed"] = (
+            flagged_df[column].astype(str).str.strip() == "Suppressed"
+        )
+
+    return flagged_df
+
 def combine_datasets(dfs):
     return pd.concat(dfs, ignore_index=True)
