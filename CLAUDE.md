@@ -52,7 +52,11 @@ end-to-end and double as the only working examples of how the `src/data/` functi
 **Which processed file to use depends on the task**: `new_1999_2024.csv` (single-year ages, highest resolution,
 1999-2024) is the primary modeling input; `harmonized_1968-2024.csv` (grouped ages, full 1968-2024 history) trades
 age resolution for a longer time series, and mixes ICD-8/9/10 cause-of-death eras — see `config.yaml`
-`step_3_holistic_harmonized_model.limitations`.
+`step_3_holistic_harmonized_model.limitations`. The planned state/cause/race subsection comparison work (API,
+dashboard, LLM reporting) uses `new_1999_2024.csv` exclusively; `harmonized_1968-2024.csv` is reserved for
+general national historic-trend visualization only. See `config.yaml` `data_collection_strategy.resolved_decision`
+for the finalized location/cause/race scope and why categories like Hispanic origin, Suicide, and Drug-induced
+deaths were deferred rather than built into the first version.
 
 **Actuarial layer (`src/actuarial/`)** builds life tables from cleaned deaths/population counts. The core
 recursion (in both `src/actuarial/life_table.py` and, not-yet-deduplicated, `scripts/step1_baseline_model_prototype.py`)
@@ -62,9 +66,13 @@ per `Year Code`/`Sex Code` group, walked in increasing age order) → `dx = qx*l
 year, sex, then increasing age before calling this (see `src/actuarial/load_filter.py:load_filter`), since the
 `lx`/`Tx` recursions rely on row order, not on the age values themselves. `lee_carter.py` now has a working
 SVD-based fit, fit diagnostics, and an Actual/Expected (A/E) validation layer (see the dedicated section below);
-`poisson_lee_carter.py` is still an empty stub — extracting/fitting the Newton-Raphson-calibrated Poisson MLE `kt`
-(see `workflow.step_2_modern_single_age_model.lee_carter_utility` in `config.yaml`) is the active next task there.
-`forecasting.py` follows once one of the two `kt` fits is treated as primary. Whichever model is treated as primary,
+`poisson_lee_carter.py` now also has a working Newton-Raphson-calibrated Poisson MLE `kt` fit (`fit_poisson_lc_all`,
+mirroring `lee_carter.py`'s `age_all`/`year_all`/`fitted_all` shape so it plugs into the same `lc_outputs.py`/
+`forecasting.py` functions) — see `workflow.step_2_modern_single_age_model.lee_carter_utility` in `config.yaml`.
+`forecasting.py` has drift-based `kt` forecasting with a 95% CI band (`forecast_kt`/`plot_kt_forecast`) and
+propagates that band through to an e65/e-at-age forecast fan chart (`project_ln_mx` → `forecast_ex_fan` →
+`plot_ex_fan_chart`), run for both the SVD and Poisson `kt` fits in `scripts/step2_all_dataset_model.py`.
+Whichever model is treated as primary,
 validation must include an out-of-sample backtest — fit on a training
 window, forecast `kt` forward, and compare the forecast against actual holdout years — not just in-sample fit
 diagnostics; see `quality_bar.out_of_sample_backtest` in `config.yaml`. `whittaker_henderson.py` is complete: a working graduation-diagnostics module (fit every year/sex group at a
@@ -85,7 +93,9 @@ or replace the model; all output must carry the disclaimer "AI-generated interpr
 before client or external use"), and `src/visualization/` (plots + Power BI/Tableau-ready CSV exports). Read the
 corresponding `ai_reporting`, `api_layer`, and `dashboard_strategy` sections of `config.yaml` before implementing
 these — they specify constraints (e.g., the RAG pipeline is simple year-range/cause-tag corpus matching, not a
-vector DB) that aren't visible from the empty stub files alone.
+vector DB, and `api_layer.credibility_gate` requires the API to flag or suppress any filter combination whose
+underlying cell counts are CDC-suppressed or too small to trust, surfaced as an explicit message in the dashboard
+rather than a broken or misleading chart) that aren't visible from the empty stub files alone.
 
 **`src/actuarial/eda.py`** (the planned location was `src/eda/`; it ended up colocated with the other actuarial
 modules instead, since it needs the same life-table columns) holds the analyst-facing diagnostics, deliberately
@@ -138,15 +148,17 @@ reference for how these functions compose.
 
 `src/actuarial/lee_carter.py` (SVD-based fit) is now built out through the full non-forecasting A/E and
 e-at-age workflow; also recorded in `config.yaml` `workflow.step_2_modern_single_age_model.lee_carter_utility`.
-`src/actuarial/poisson_lee_carter.py` is still an empty import-only stub.
-
-A prior session reportedly added a Newton-Raphson-calibrated `kt` (the standard Brouhns/Denuit/Vermunt
-Poisson Lee-Carter MLE fit, which has no closed-form SVD solution and is solved iteratively) — none of
-that exists in this repo or its git history as of 2026-08-28 (verified via `git diff`/`git stash list`,
-both showed nothing matching); it was lost in an unsaved session. Treat it as **not yet done** rather
-than assume it exists. (The A/E metric and e-at-age progression view from that same lost session have
-since been rebuilt from scratch — see the function list below — independent of whether the Poisson `kt`
-fit ever gets redone, since both work fine off the existing SVD-based `kt`.)
+`src/actuarial/poisson_lee_carter.py` now also has a working Newton-Raphson-calibrated `kt` fit (the
+standard Brouhns/Denuit/Vermunt Poisson Lee-Carter MLE, which has no closed-form SVD solution and is
+solved iteratively): `death_exposure_matrix` pivots `Deaths`/`Population` into Year × Age matrices,
+`initial_guess` seeds `ax`/`bx`/`kt` off the SVD fit's `ln(mx_hat)`, `update_ax`/`update_bx`/`update_kt`
+are the per-parameter Newton-Raphson steps (score/Hessian off the Poisson log-likelihood), `normalize_param`
+enforces the usual `sum(bx)=1`/`mean(kt)=0` identification constraints each iteration, and `fit_poisson_lc`/
+`fit_poisson_lc_all` wrap the iteration loop and per-sex concatenation. `fit_poisson_lc_all` reuses
+`lc_outputs.py`'s `reconstruct_lc`/`build_lc_tables`, so its `age_all`/`year_all`/`fitted_all` output has the
+exact same shape as `lee_carter.py`'s SVD fit — every downstream function (`ae_metric`, `ex_progression_plot`,
+everything in `forecasting.py` below) works unmodified on either fit's output, and
+`scripts/step2_all_dataset_model.py` now runs the full pipeline for both.
 
 Function list, in the order they appear in the file (fit pipeline → fit diagnostics → A/E workflow →
 e-at-age comparison):
@@ -183,13 +195,41 @@ e-at-age comparison):
   (`life_table.py`), then plots fitted `ex` against the actual (unsmoothed) `ex` at `age` for every sex in
   the data, one figure per sex. Historical comparison only, distinct from the forecast e65 fan chart below.
 
-Planned visualization roadmap once the Poisson Lee-Carter fit exists, in rough priority order:
-- **kt trajectory + forecast fan chart** — historical calibrated `kt` plus forecast with widening
-  confidence bands; `scripts/step1_baseline_model_prototype.py`'s `plot_kt_forecast`/`forecast_kt` is the
-  un-ported starting point, destined for `src/actuarial/forecasting.py` (currently empty).
-- **e65 (or e0) fan chart** — life expectancy forecast propagated from the kt fan chart; this is the
-  number that actually gets presented to a non-technical audience. (Distinct from the historical
-  `ex_progression_plot` above.)
+`src/actuarial/forecasting.py` — **done** through the kt forecast and e65 fan chart (ported and generalized
+from `scripts/step1_baseline_model_prototype.py`'s single-sex `forecast_kt`/`plot_kt_forecast` prototype to
+handle both sexes via per-`Sex Code` loops, and to work off either the SVD or Poisson `kt` fit):
+
+- `calculate_kt_changes(year_all)` / `estimate_drift(year_sorted)` — per-sex `delta_kt = diff(kt)`, then
+  per-sex drift (`mean`) and `sigma` (`std`) of that difference — the random-walk-with-drift parameters.
+- `kt_in_sample_fit(year_sorted, drift_df)` / `plot_kt_in_sample_fit(kt_fit_df)` — extends the drift line
+  back across the historical `kt` (sanity-check that the drift assumption isn't a bad fit) before ever
+  forecasting forward with it.
+- `forecast_kt(year_sorted, drift_df, forecast_years)` — projects `kt` forward per sex by `forecast_years`
+  steps of `drift`, plus a 95% CI band (`kt_forecast ± 1.96 * sigma * sqrt(step)`) — the standard random-walk
+  forecast interval, widening with the square root of the horizon.
+- `plot_kt_forecast(year_sorted, kt_forecast_df)` — historical `kt` plus the forecast line and red dashed
+  CI bounds, one figure per sex; the historical segment has no CI columns so the band only renders over the
+  forecast horizon, matching the step1 prototype's behavior.
+- `project_ln_mx(age_all, kt_forecast_df)` — reconstructs the full forecast mortality surface via the
+  Lee-Carter identity `ln(mx) = ax + bx*kt`, for every age × forecast year × sex — run once each for the
+  central `kt_forecast` and for the `kt_lower`/`kt_upper` CI bounds (`forecast_mx`, `forecast_mx_kt_low`,
+  `forecast_mx_kt_high`). Since `bx`'s sign varies by age, `kt_lower` does not always correspond to the
+  lower-mortality scenario at every age — that's resolved downstream rather than assumed here.
+- `build_forecast_life_table(ln_mx_projection, mx_column)` — turns one of those three mx columns into a
+  full projected life table by reusing `life_table.py`'s `add_life_tab_col` (setting `Population=1`,
+  `Deaths=mx` so `qx` recovers `mx` directly, since there's no real forecast-year exposure to divide by).
+- `forecast_ex_fan(ln_mx_projection, age=65)` — builds all three life tables (central, `kt_lower`,
+  `kt_upper`), pulls `ex` at `age` from each, and takes elementwise `min`/`max` of the two bound scenarios
+  to get `ex_lower`/`ex_upper` — rather than assuming the `kt_lower` scenario is the lower-`ex` one, since
+  that direction flips wherever `bx` is negative at that age.
+- `plot_ex_fan_chart(single_age_life_table, ex_fan_df, age=65)` — the report-facing chart: historical
+  actual `ex` at `age`, the forecast central line, and a shaded `ex_lower`/`ex_upper` band, one figure per
+  sex. This is the number that actually gets presented to a non-technical audience (distinct from the
+  historical `ex_progression_plot` above).
+
+Both are wired end-to-end for the SVD and Poisson `kt` fits in `scripts/step2_all_dataset_model.py`.
+
+Still outstanding:
 - **Cumulative A/E deviation over time** — same spirit as `wh_worst_cumdev`, checking whether the
   Poisson-calibrated model systematically over/under-predicts deaths moving away from the fit window.
 - **Out-of-sample backtest plot** — forecast vs. actual mx/ex for held-out years, required by

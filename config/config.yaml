@@ -201,7 +201,7 @@ workflow:
     models:
       - lee_carter
       - poisson_lee_carter
-    use_case: Long-run mortality trend comparison with reduced age detail.
+    use_case: Long-run mortality trend comparison with reduced age detail; general historic trend visualization only. Not used for the state/cause/race subsection comparison scope in future_reporting_parameters — that scope is restricted to the single-age (1999-2024) dataset, since combining both eras for that level of stratified analysis was judged too complicated relative to the benefit. See data_collection_strategy.resolved_decision.
     limitations:
       - Uses grouped ages rather than single-year ages.
       - Historical files span ICD-8, ICD-9, and ICD-10 eras.
@@ -217,19 +217,39 @@ data_collection_strategy:
     - CDC WONDER mortality data updates roughly annually, so there is no real freshness benefit to querying live.
     - Removes CDC WONDER uptime and rate limits as a failure point during a live demo or interview.
   open_decision: The exact subset of states/causes/demographics for the static pull is not yet chosen. future_reporting_parameters below lists the full aspirational set; recommend narrowing to a small subset (for example 2-3 states, top 4-5 causes of death) for the first working version and expanding later if time allows.
+  resolved_decision:
+    status: resolved
+    date: 2026-09-08
+    scope: Applies only to the single-age (1999-2024) dataset. The harmonized 1968-2024 dataset stays general-trend-visualization only and is not part of this state/cause/race comparison scope — see step_3_holistic_harmonized_model.use_case. Combining both eras for this level of stratified analysis was judged too complicated relative to the benefit.
+    chosen:
+      - "Locations: United States (baseline) plus California, Texas, Florida, New York — the actual top 4 most populous states per 2024 Census estimates. Illinois (originally listed) was dropped since it is the 6th most populous state, not top 5."
+      - "Causes of death: All causes (baseline) plus Heart disease, Cancer, Cerebrovascular disease (stroke), Chronic lower respiratory disease, and COVID-19. The first four are high-volume causes stable across the full 1999-2024 window; COVID-19 is included despite lower average volume because it is the central subject of the cross-subsection comparison this project is built around — its credibility should be judged against its actual 2020-2021 concentration, not averaged across the full panel."
+      - "Optional demographics: Race only, using the 4-group Bridged Race scheme (White, Black, American Indian/Alaska Native, Asian/Pacific Islander), isolated as its own tier crossed only with Location x All-causes, never with individual diseases."
+    deferred:
+      - "Suicide, Drug-induced deaths, Diabetes, Alzheimer's disease, External causes/accidents: back-of-envelope volume estimates (e.g., Illinois suicide deaths spread across single-year ages 20-84 land near ~14 deaths/cell, at CDC WONDER's under-10 suppression threshold) show these would suppress heavily once crossed with state and single-year age. Deferred as future work, not rejected outright."
+      - "Hispanic origin: would compound suppression risk as a second demographic cross-cut alongside Race (State x Race x Hispanic origin x All-causes). Also carries a documented data-quality concern independent of sample size — Hispanic origin on US death certificates is typically informant-reported rather than self-reported, a known contributor to the 'Hispanic mortality paradox' literature."
+    rationale_note: Race uses the 4-group Bridged Race scheme specifically because the two raw single-age source files use different race schemes (Underlying Cause of Death 1999-2020 uses Bridged Race; 2018-2024 Single Race uses a finer single-race scheme) — Bridged Race is the common denominator across the full 1999-2024 window, not a design preference.
 
 api_layer:
   status: scaffolded_not_implemented
   location: src/api/ (main.py, schemas.py)
-  decision: Build a small self-hosted API (FastAPI) that filters the static processed dataset and model outputs by state, sex, cause of death, age range, and year, rather than proxying live to CDC WONDER.
+  decision: Build a small self-hosted API (FastAPI) that filters the static processed single-age (1999-2024) dataset and model outputs by state, sex, cause of death, age range, year, and (only when cause of death is All causes) race, rather than proxying live to CDC WONDER. The harmonized 1968-2024 dataset is served separately for general historic-trend endpoints only, not through these subsection filters.
   purpose: Serve subsection queries to the Streamlit dashboard and to the LLM reporting layer, so both consume the same filtered data instead of duplicating query logic.
+  credibility_gate:
+    status: planned
+    purpose: Prevent the API from silently returning a misleading rate/trend for a filter combination whose underlying cell counts are too small to trust, generalizing beyond the specific Race x individual-disease guard above to any requested combination.
+    mechanism:
+      - "Hard floor: CDC WONDER's own under-10 suppression. A requested cell that comes back suppressed (NaN after cleaning) is reported as 'Suppressed by CDC WONDER (fewer than 10 deaths) - not available', not silently propagated through the life table or model."
+      - "Soft floor: a project-defined minimum expected-death-count threshold, above CDC's hard suppression floor but still too small for a stable single-year-age or Poisson Lee-Carter fit; requests landing below it are flagged 'Low credibility - small sample' rather than presented as an equally reliable statistic. Exact threshold to be calibrated against the actual pulled data; the underlying actuarial concept is limited fluctuation/partial credibility weighting (Z = sqrt(n / n_full)), not an arbitrary cutoff. A full partial-credibility weighting scheme (blending a low-credibility cell toward a broader baseline instead of just flagging it) is a stretch goal beyond this initial gate."
+      - "Applies to the Race x individual-disease combination flagged in future_reporting_parameters.optional_demographics_note and, more generally, to any state x cause x age x sex x year combination requested through the API, not only the ones anticipated during scoping."
+    surfaced_in: The dashboard shows a suppressed or low-credibility combination as an explicit message in place of a chart, never a broken or silently misleading one; the LLM reporting layer must never narrate a statistic from a suppressed or flagged-low-credibility cell as if it were reliable.
 
 dashboard_strategy:
   status: planned
   primary:
     tool: Streamlit
     reason: Python-native, integrates directly with the API and the LLM reporting layer, deployable free with a live public link for the resume.
-    scope: Interactive subsection filters (state, sex, cause of death, age, year) plus an AI Insight panel powered by ai_reporting. Also absorbs step 1's originally-scoped mini dashboard (life expectancy/survival KPIs, year filter) instead of building that twice.
+    scope: Two views reflecting the two-tier dataset design. (1) A general historic trend view on the harmonized 1968-2024 dataset, national only, no cause/race stratification — absorbs step 1's originally-scoped mini dashboard (life expectancy/survival KPIs, year filter) instead of building that twice. (2) A detailed subsection comparison view on the single-age 1999-2024 dataset only, with interactive filters for state, sex, cause of death, age, and year, plus an optional race filter enabled only when cause of death is All causes (race is not crossed with individual diseases; see future_reporting_parameters). Both views defer to api_layer.credibility_gate — a filter combination that is CDC-suppressed or below the low-credibility threshold renders as an explicit message in place of a chart, not a broken or misleading one. Also includes an AI Insight panel powered by ai_reporting.
   secondary:
     tool: Power BI
     reason: The tool actuaries and insurers actually use day to day; demonstrates industry fluency with DAX measures and executive-style KPI dashboards.
@@ -242,7 +262,7 @@ dashboard_strategy:
 ai_reporting:
   status: planned
   purpose: Generate plain-English commentary and reports for a user-selected subsection (state, sex, cause of death, age range, year), grounded in the project's own computed statistics rather than open-ended generation.
-  guardrail: The AI/report layer explains statistical outputs that already exist; it must not invent numbers or replace the mortality model. All AI-generated text is labeled "AI-generated interpretation - actuarial review required" per quality_bar.ai_review_gate.
+  guardrail: The AI/report layer explains statistical outputs that already exist; it must not invent numbers or replace the mortality model. It must also treat any api_layer.credibility_gate-flagged cell (CDC-suppressed or low-credibility) as unavailable, never narrating a number from a suppressed or flagged-low-credibility combination as if it were reliable. All AI-generated text is labeled "AI-generated interpretation - actuarial review required" per quality_bar.ai_review_gate.
   pipeline:
     - Compute the real statistics for the selected subsection in Python (percent change, trend direction, inflection years, which age bands drove the change).
     - Retrieve relevant entries from a small curated context corpus (roughly 15-25 hand-written notes on known historical/epidemiological events, e.g. COVID-19 2020-2021, opioid epidemic 2015-2019, HIV/AIDS 1981-1995) by simple year-range and cause-tag matching; no vector database or embeddings needed at this corpus size.
@@ -268,34 +288,38 @@ active_parameters:
     - All causes
 
 future_reporting_parameters:
-  description: Later dashboard/API/report filters after the expanded datasets are cleaned and validated.
-  scope_note: Full aspirational set. See data_collection_strategy.open_decision for the recommendation to narrow this to a smaller subset for the first working version.
+  description: Dashboard/API/report filters for the state/cause/race comparison scope, resolved 2026-09-08 (see data_collection_strategy.resolved_decision for full rationale). Restricted to the single-age (1999-2024) dataset only.
   locations:
     - United States
     - California
     - Texas
     - Florida
     - New York
-    - Illinois
   sex:
     - Male
     - Female
     - Total
   cause_of_death:
     - All causes
-    - Cancer
     - Heart disease
-    - Stroke
-    - Diabetes
-    - Alzheimer's disease
+    - Cancer
+    - Cerebrovascular disease (stroke)
     - Chronic lower respiratory disease
     - COVID-19
-    - Drug-induced deaths
-    - External causes/accidents
-    - Suicide
   optional_demographics:
     - Race
-    - Hispanic origin
+  optional_demographics_note: Race (4-group Bridged Race) is isolated as its own tier, crossed only with locations x All-causes, never with individual causes of death. See data_collection_strategy.resolved_decision.
+  superseded_from_aspirational_set:
+    locations_dropped:
+      - Illinois
+    causes_dropped:
+      - Diabetes
+      - Alzheimer's disease
+      - Drug-induced deaths
+      - External causes/accidents
+      - Suicide
+    demographics_dropped:
+      - Hispanic origin
 
 age_handling:
   primary_model_ages: 20-84
@@ -363,6 +387,14 @@ quality_bar:
     status: planned
     required_language: AI-generated interpretation - actuarial review required before client or external use.
     implementation_note: Enforced by ai_reporting.guardrail.
+  credibility_gate:
+    requirement: The API, dashboard, and LLM reporting layer never present a statistic from a suppressed or low-credibility cell as if it were as reliable as a well-populated one.
+    status: planned
+    evidence_needed:
+      - CDC-suppressed cells return an explicit "not available" response, not a silently coerced NaN propagated through the life table.
+      - Low-credibility (small-sample) cells are flagged distinctly from both suppressed cells and well-populated cells.
+      - The dashboard and LLM reporting layer both respect the flag, not just the API returning it.
+    implementation_note: See api_layer.credibility_gate for the mechanism and data_collection_strategy.resolved_decision for the scoping decisions (dropped causes/demographics) this gate is meant to catch cases beyond.
   validation_failure_mode:
     requirement: Validation includes at least one place where the model performs poorly and explains why.
     status: planned

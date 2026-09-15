@@ -113,7 +113,7 @@ def plot_progression_eda(df, sex_code, column, start_year=None, gaps=1):
 
     plt.figure(figsize=(10,6))
 
-    for year, year_df in filtered_df.groupby(['Year Code']):
+    for year, year_df in filtered_df.groupby('Year Code'):
         plt.plot(
         year_df[age_col],
         year_df[column],
@@ -134,7 +134,7 @@ def top_n_ex(df, sex_code, df_n=5):
 
         slope_list = []
 
-        for age, age_df in top_df.groupby(['Single-Year Ages Code']):
+        for age, age_df in top_df.groupby('Single-Year Ages Code'):
             age_df = age_df.sort_values(['Year Code'])
             slope = np.polyfit(age_df['Year Code'], age_df['ex'], 1)[0]
             slope_list.append({'Age': age, 'Sex': sex_code, 'Slope': slope})
@@ -151,7 +151,7 @@ def top_n_ex(df, sex_code, df_n=5):
 
         slope_list = []
 
-        for age, age_df in top_df.groupby(['Age Group']):
+        for age, age_df in top_df.groupby('Age Group'):
             age_df = age_df.sort_values(['Year Code'])
             slope = np.polyfit(age_df['Year Code'], age_df['ex'], 1)[0]
             slope_list.append({'Age': age, 'Sex': sex_code, 'Slope': slope})
@@ -188,7 +188,7 @@ def plot_top_ex(df, sex_code, plot_n=3):
                 neg_df['ex']
             )
 
-            plt.title(f"Top {top_neg} Worst Life Expectancy Progression\nAge: {agen} Sex: {sexn}")
+            plt.title(f"Top {top_neg} Worst Life Expectancy Progression\nAge: {int(agen)} Sex: {sexn}")
             plt.xlabel("Year")
             plt.ylabel("Life Expectancy")
             plt.grid(True)
@@ -212,7 +212,7 @@ def plot_top_ex(df, sex_code, plot_n=3):
                 pos_df['ex']
             )
 
-            plt.title(f"Top {top_pos} Best Life Expectancy Progression\nAge: {agep} Sex: {sexp}")
+            plt.title(f"Top {top_pos} Best Life Expectancy Progression\nAge: {int(agep)} Sex: {sexp}")
             plt.xlabel("Year")
             plt.ylabel("Life Expectancy")
             plt.grid(True)
@@ -323,7 +323,7 @@ def plot_pct_heatmap(df, sex_code):
 
         im = plt.imshow(
             improvement_pivot.to_numpy(),
-            cmap='RdBu_r',
+            cmap='RdBu',
             norm=norm,
             aspect='auto',
             origin='lower'
@@ -356,7 +356,7 @@ def plot_pct_heatmap(df, sex_code):
 
         im = plt.imshow(
             improvement_pivot.to_numpy(),
-            cmap='RdBu_r',
+            cmap='RdBu',
             norm=norm,
             aspect='auto',
             origin='lower'

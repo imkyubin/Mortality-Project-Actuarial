@@ -13,7 +13,7 @@ def load_filter(
     df = pd.read_csv(path)
     validation_df = df.copy()
 
-    validation_df["Year Code"] = pd.to_numeric(validation_df["Year Code"])
+    validation_df["Year Code"] = pd.to_numeric(validation_df["Year Code"]).astype(int)
     validation_df["Deaths"] = pd.to_numeric(
         validation_df["Deaths"],
         errors='coerce',
