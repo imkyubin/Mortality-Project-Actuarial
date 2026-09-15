@@ -201,7 +201,7 @@ workflow:
     models:
       - lee_carter
       - poisson_lee_carter
-    use_case: Long-run mortality trend comparison with reduced age detail; general historic trend visualization only. Not used for the state/cause/race subsection comparison scope in future_reporting_parameters — that scope is restricted to the single-age (1999-2024) dataset, since combining both eras for that level of stratified analysis was judged too complicated relative to the benefit. See data_collection_strategy.resolved_decision.
+    use_case: Long-run mortality trend comparison with reduced age detail; general historic trend visualization only. Not used for the state/cause subsection comparison scope in future_reporting_parameters — that scope is restricted to the single-age (1999-2024) dataset, since combining both eras for that level of stratified analysis was judged too complicated relative to the benefit. See data_collection_strategy.resolved_decision.
     limitations:
       - Uses grouped ages rather than single-year ages.
       - Historical files span ICD-8, ICD-9, and ICD-10 eras.
@@ -220,37 +220,43 @@ data_collection_strategy:
   resolved_decision:
     status: resolved
     date: 2026-09-08
-    scope: Applies only to the single-age (1999-2024) dataset. The harmonized 1968-2024 dataset stays general-trend-visualization only and is not part of this state/cause/race comparison scope — see step_3_holistic_harmonized_model.use_case. Combining both eras for this level of stratified analysis was judged too complicated relative to the benefit.
+    scope: Applies only to the single-age (1999-2024) dataset. The harmonized 1968-2024 dataset stays general-trend-visualization only and is not part of this state/cause comparison scope — see step_3_holistic_harmonized_model.use_case. Combining both eras for this level of stratified analysis was judged too complicated relative to the benefit.
     chosen:
       - "Locations: United States (baseline) plus California, Texas, Florida, New York — the actual top 4 most populous states per 2024 Census estimates. Illinois (originally listed) was dropped since it is the 6th most populous state, not top 5."
       - "Causes of death: All causes (baseline) plus Heart disease, Cancer, Cerebrovascular disease (stroke), Chronic lower respiratory disease, and COVID-19. The first four are high-volume causes stable across the full 1999-2024 window; COVID-19 is included despite lower average volume because it is the central subject of the cross-subsection comparison this project is built around — its credibility should be judged against its actual 2020-2021 concentration, not averaged across the full panel."
-      - "Optional demographics: Race only, using the 4-group Bridged Race scheme (White, Black, American Indian/Alaska Native, Asian/Pacific Islander), isolated as its own tier crossed only with Location x All-causes, never with individual diseases."
     deferred:
       - "Suicide, Drug-induced deaths, Diabetes, Alzheimer's disease, External causes/accidents: back-of-envelope volume estimates (e.g., Illinois suicide deaths spread across single-year ages 20-84 land near ~14 deaths/cell, at CDC WONDER's under-10 suppression threshold) show these would suppress heavily once crossed with state and single-year age. Deferred as future work, not rejected outright."
-      - "Hispanic origin: would compound suppression risk as a second demographic cross-cut alongside Race (State x Race x Hispanic origin x All-causes). Also carries a documented data-quality concern independent of sample size — Hispanic origin on US death certificates is typically informant-reported rather than self-reported, a known contributor to the 'Hispanic mortality paradox' literature."
-    rationale_note: Race uses the 4-group Bridged Race scheme specifically because the two raw single-age source files use different race schemes (Underlying Cause of Death 1999-2020 uses Bridged Race; 2018-2024 Single Race uses a finer single-race scheme) — Bridged Race is the common denominator across the full 1999-2024 window, not a design preference.
+      - "Hispanic origin: carries a documented data-quality concern independent of sample size — Hispanic origin on US death certificates is typically informant-reported rather than self-reported, a known contributor to the 'Hispanic mortality paradox' literature. Deferred, not rejected outright."
+    narrowed_further:
+      date: 2026-09-15
+      change: "Race dropped from scope entirely (had been chosen on 2026-09-08 as an isolated Location x All-causes demographic tier, the 4-group Bridged Race scheme). Not a data-quality finding — a deliberate scope cut. The state/cause comparison scope is now exactly two crossed dimensions: Location x Sex x Cause of death, single-age (1999-2024) dataset only."
 
 api_layer:
   status: scaffolded_not_implemented
   location: src/api/ (main.py, schemas.py)
-  decision: Build a small self-hosted API (FastAPI) that filters the static processed single-age (1999-2024) dataset and model outputs by state, sex, cause of death, age range, year, and (only when cause of death is All causes) race, rather than proxying live to CDC WONDER. The harmonized 1968-2024 dataset is served separately for general historic-trend endpoints only, not through these subsection filters.
+  decision: Build a small self-hosted API (FastAPI) that filters the static processed single-age (1999-2024) dataset and model outputs by state, sex, cause of death, age range, and year, rather than proxying live to CDC WONDER. The harmonized 1968-2024 dataset is served separately for general historic-trend endpoints only, not through these subsection filters.
   purpose: Serve subsection queries to the Streamlit dashboard and to the LLM reporting layer, so both consume the same filtered data instead of duplicating query logic.
   credibility_gate:
     status: planned
-    purpose: Prevent the API from silently returning a misleading rate/trend for a filter combination whose underlying cell counts are too small to trust, generalizing beyond the specific Race x individual-disease guard above to any requested combination.
+    purpose: Prevent the API from silently returning a misleading rate/trend for a filter combination whose underlying cell counts are too small to trust.
     mechanism:
       - "Hard floor: CDC WONDER's own under-10 suppression. A requested cell that comes back suppressed (NaN after cleaning) is reported as 'Suppressed by CDC WONDER (fewer than 10 deaths) - not available', not silently propagated through the life table or model."
-      - "Soft floor: a project-defined minimum expected-death-count threshold, above CDC's hard suppression floor but still too small for a stable single-year-age or Poisson Lee-Carter fit; requests landing below it are flagged 'Low credibility - small sample' rather than presented as an equally reliable statistic. The underlying actuarial concept is limited fluctuation/partial credibility weighting (Z = sqrt(n / n_full)), not an arbitrary cutoff. A full partial-credibility weighting scheme (blending a low-credibility cell toward a broader baseline instead of just flagging it) is a stretch goal beyond this initial gate. See age_banding_design below for how this soft floor is actually implemented for the state/cause/race cross-tab specifically."
-      - "Applies to the Race x individual-disease combination flagged in future_reporting_parameters.optional_demographics_note and, more generally, to any state x cause x age x sex x year combination requested through the API, not only the ones anticipated during scoping."
+      - "Soft floor: a project-defined minimum expected-death-count threshold, above CDC's hard suppression floor but still too small for a stable single-year-age or Poisson Lee-Carter fit; requests landing below it are flagged 'Low credibility - small sample' rather than presented as an equally reliable statistic. The underlying actuarial concept is limited fluctuation/partial credibility weighting (Z = sqrt(n / n_full)), not an arbitrary cutoff. A full partial-credibility weighting scheme (blending a low-credibility cell toward a broader baseline instead of just flagging it) is a stretch goal beyond this initial gate. See age_banding_design below for how this soft floor is actually implemented for the state/cause cross-tab specifically."
+      - "Applies to any state x cause x age x sex x year combination requested through the API, not only the ones anticipated during scoping."
     age_banding_design:
       status: planned
       date: 2026-09-15
       standard: Classical Limited Fluctuation Credibility for claim counts requires roughly 1,082 expected claims for full credibility (Poisson assumption, +/-5% margin at 90% confidence); Z = sqrt(n / n_full) gives partial credibility below that.
-      key_insight: Mortality rate rises steeply with age (Gompertz), so for a fixed state/sex/cause, absolute death counts are often larger at older ages despite a smaller population at risk — the rate effect dominates. This means credible age-bucket width should vary inversely with age, not be fixed globally — wide bands (15-20 years) at the youngest ages (20s-30s), narrowing through the 40s-60s, down to single-year (or near it) at the oldest ages (75-84) where the common causes in the larger states already clear full credibility. A single global age cutoff either wastes real signal at ages where a given slice is actually credible, or still under-covers ages where it is not.
-      per_sublevel_variation: The credible age-bucket width must be computed independently per (state, sex, cause, race) combination, not once globally — population size (state), disease frequency (cause), and demographic group size (race) each change how much data volume exists at a given age. National (all 4 states combined) x All Causes is credible at single-year age almost everywhere; a single state x a single disease (especially the rarer of the five chosen causes, e.g. cerebrovascular disease or chronic lower respiratory disease) needs real banding, more so in the smaller of the four states and at younger ages.
+      key_insight: Mortality rate rises steeply with age (Gompertz), so for a fixed state/sex/cause, absolute death counts are often larger at older ages despite a smaller population at risk — the rate effect dominates. This means credible age-bucket width should vary inversely with age, not be fixed globally — younger ages need wider aggregation, older ages can often stay at single-year resolution where the common causes in the larger states already clear full credibility. A single global age cutoff either wastes real signal at ages where a given slice is actually credible, or still under-covers ages where it is not.
+      per_sublevel_variation: The credible age resolution must be decided independently per (state, sex, cause) combination, not once globally — population size (state) and disease frequency (cause) each change how much data volume exists at a given age. National (all 4 states combined) x All Causes is credible at single-year age almost everywhere; a single state x a single disease (especially the rarer of the five chosen causes, e.g. cerebrovascular disease or chronic lower respiratory disease) needs real banding, more so in the smaller of the four states and at younger ages.
+      resolved_scheme:
+        date: 2026-09-15
+        decision: "Binary choice per (state, sex, cause) combination rather than a swept set of candidate bucket widths: single-year age, or the existing harmonized grouped-age scheme already implemented in harmonization.py (map_single_age), restricted to the bins that fall inside the 20-84 modeling range: 20-24, 25-34, 35-44, 45-54, 55-64, 65-74, 75-84. Chosen over a custom width sweep because it reuses already-implemented, already-tested binning logic instead of new candidate-width code."
+        testing_grid: "Location (5: US, California, Texas, Florida, New York) x Sex (3: Male, Female, Total) x Cause of death (6: All causes, Heart disease, Cancer, Cerebrovascular disease, Chronic lower respiratory disease, COVID-19) = 90 combinations, each evaluated for whether single-year age clears the soft-floor threshold or must fall back to the 7-bin harmonized grouping. The 15 All-causes combinations (5 locations x 3 sexes) are expected to clear single-year credibility everywhere, matching the existing national all-cause file; the 75 individual-disease combinations are where the real testing burden is."
+        known_limitation: "The harmonized scheme's 20-24 bin is only 5 years wide — narrower than the 15-20 year band the key_insight above suggests is needed at the youngest working ages — so it will not fully rescue the youngest-age, rarest-disease, smallest-state cells. Those specific (state, sex, cause) combinations at ages 20-24 (and possibly 25-34) are expected to remain flagged as not viable at either supported resolution; that is treated as a correct, honest outcome rather than a gap requiring a third custom bucket width."
       planned_mechanism:
-        - "An offline precompute step (not a live API/dashboard calculation) evaluates each (state, sex, cause, race) combination against a small set of candidate age-bucket widths (single-year, 5-year, 10-year, and a wider custom band for the youngest ages)."
-        - "It materializes a handful of pre-aggregated tables at those widths, plus one small lookup table mapping each filter combination to the coarsest-necessary credible age scheme for that combination."
+        - "An offline precompute step (not a live API/dashboard calculation) evaluates each (state, sex, cause) combination against the two resolved_scheme options above."
+        - "It materializes the two pre-aggregated tables (single-year and the 7-bin harmonized grouping), plus one small lookup table mapping each filter combination to whichever of the two is credible for it."
         - "The API, dashboard, and LLM reporting layer all consult this same lookup table rather than each computing credibility independently, keeping the logic centralized, testable outside the UI layer, and fast at render time (no live credibility math per interaction)."
       dashboard_feasibility_note: Streamlit (or any reactive dashboard framework) handles this without difficulty — selecting a filter combination triggers a lookup against the small credibility table and a pull of the correspondingly pre-aggregated data, the same reactive pattern as any other filter-driven rerender; st.cache_data on the load/aggregation functions keeps repeated reruns fast. This is a data-design question, not a UI limitation.
     surfaced_in: The dashboard shows a suppressed or low-credibility combination as an explicit message in place of a chart, never a broken or silently misleading one; the LLM reporting layer must never narrate a statistic from a suppressed or flagged-low-credibility cell as if it were reliable.
@@ -260,7 +266,7 @@ dashboard_strategy:
   primary:
     tool: Streamlit
     reason: Python-native, integrates directly with the API and the LLM reporting layer, deployable free with a live public link for the resume.
-    scope: Two views reflecting the two-tier dataset design. (1) A general historic trend view on the harmonized 1968-2024 dataset, national only, no cause/race stratification — absorbs step 1's originally-scoped mini dashboard (life expectancy/survival KPIs, year filter) instead of building that twice. (2) A detailed subsection comparison view on the single-age 1999-2024 dataset only, with interactive filters for state, sex, cause of death, age, and year, plus an optional race filter enabled only when cause of death is All causes (race is not crossed with individual diseases; see future_reporting_parameters). Both views defer to api_layer.credibility_gate — a filter combination that is CDC-suppressed or below the low-credibility threshold renders as an explicit message in place of a chart, not a broken or misleading one. View (2)'s age axis granularity is not fixed — it adapts per selected filter combination per api_layer.credibility_gate.age_banding_design (e.g. single-year age nationally, wider bands for a rare cause in a small state), driven by a precomputed lookup table rather than live calculation. Also includes an AI Insight panel powered by ai_reporting.
+    scope: Two views reflecting the two-tier dataset design. (1) A general historic trend view on the harmonized 1968-2024 dataset, national only, no cause stratification — absorbs step 1's originally-scoped mini dashboard (life expectancy/survival KPIs, year filter) instead of building that twice. (2) A detailed subsection comparison view on the single-age 1999-2024 dataset only, with interactive filters for state, sex, cause of death, age, and year. Both views defer to api_layer.credibility_gate — a filter combination that is CDC-suppressed or below the low-credibility threshold renders as an explicit message in place of a chart, not a broken or misleading one. View (2)'s age axis granularity is not fixed — it adapts per selected filter combination per api_layer.credibility_gate.age_banding_design (single-year age, or the 7-bin harmonized grouping, whichever is credible for that combination), driven by a precomputed lookup table rather than live calculation. Also includes an AI Insight panel powered by ai_reporting.
   secondary:
     tool: Power BI
     reason: The tool actuaries and insurers actually use day to day; demonstrates industry fluency with DAX measures and executive-style KPI dashboards.
@@ -299,7 +305,7 @@ active_parameters:
     - All causes
 
 future_reporting_parameters:
-  description: Dashboard/API/report filters for the state/cause/race comparison scope, resolved 2026-09-08 (see data_collection_strategy.resolved_decision for full rationale). Restricted to the single-age (1999-2024) dataset only.
+  description: Dashboard/API/report filters for the state/cause comparison scope, resolved 2026-09-08, Race dropped from scope 2026-09-15 (see data_collection_strategy.resolved_decision for full rationale). Restricted to the single-age (1999-2024) dataset only.
   locations:
     - United States
     - California
@@ -317,9 +323,6 @@ future_reporting_parameters:
     - Cerebrovascular disease (stroke)
     - Chronic lower respiratory disease
     - COVID-19
-  optional_demographics:
-    - Race
-  optional_demographics_note: Race (4-group Bridged Race) is isolated as its own tier, crossed only with locations x All-causes, never with individual causes of death. See data_collection_strategy.resolved_decision.
   superseded_from_aspirational_set:
     locations_dropped:
       - Illinois
@@ -330,6 +333,7 @@ future_reporting_parameters:
       - External causes/accidents
       - Suicide
     demographics_dropped:
+      - Race
       - Hispanic origin
 
 age_handling:

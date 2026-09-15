@@ -52,11 +52,13 @@ end-to-end and double as the only working examples of how the `src/data/` functi
 **Which processed file to use depends on the task**: `new_1999_2024.csv` (single-year ages, highest resolution,
 1999-2024) is the primary modeling input; `harmonized_1968-2024.csv` (grouped ages, full 1968-2024 history) trades
 age resolution for a longer time series, and mixes ICD-8/9/10 cause-of-death eras — see `config.yaml`
-`step_3_holistic_harmonized_model.limitations`. The planned state/cause/race subsection comparison work (API,
+`step_3_holistic_harmonized_model.limitations`. The planned state/cause subsection comparison work (API,
 dashboard, LLM reporting) uses `new_1999_2024.csv` exclusively; `harmonized_1968-2024.csv` is reserved for
 general national historic-trend visualization only. See `config.yaml` `data_collection_strategy.resolved_decision`
-for the finalized location/cause/race scope and why categories like Hispanic origin, Suicide, and Drug-induced
-deaths were deferred rather than built into the first version.
+for the finalized location/cause scope and why categories like Race, Hispanic origin, Suicide, and Drug-induced
+deaths were deferred rather than built into the first version (Race was chosen on 2026-09-08 as an isolated
+demographic tier, then dropped from scope entirely on 2026-09-15 — a deliberate scope cut, not a data-quality
+finding).
 
 **Actuarial layer (`src/actuarial/`)** builds life tables from cleaned deaths/population counts. The core
 recursion (in both `src/actuarial/life_table.py` and, not-yet-deduplicated, `scripts/step1_baseline_model_prototype.py`)
@@ -85,7 +87,7 @@ for the current function list.
 *before* `pd.to_numeric(errors="coerce")` turns it into an indistinguishable `NaN` — wired into
 `scripts/data_cleaning_exploration.py` right after `combine_datasets`, so both processed files carry the flag.
 It's a no-op today (national all-cause single-age counts don't hit the under-10 threshold), but it matters once
-the state/cause/race pull below lands, since those combinations will suppress routinely. See
+the state/cause pull below lands, since those combinations will suppress routinely. See
 `data.known_data_quality_risk` in `config.yaml` for a related unfixed gap in `harmonization.py`'s `aggregate()`
 (plain `Deaths` sum, no suppression propagation) that isn't triggered yet but would need fixing before that
 function ever sees suppressible data.
@@ -100,15 +102,22 @@ these — they specify constraints (e.g., the RAG pipeline is simple year-range/
 vector DB, and `api_layer.credibility_gate` requires the API to flag or suppress any filter combination whose
 underlying cell counts are CDC-suppressed or too small to trust, surfaced as an explicit message in the dashboard
 rather than a broken or misleading chart) that aren't visible from the empty stub files alone. The credibility
-gate's age axis specifically is planned as *adaptive per filter combination* rather than one fixed cutoff or bucket
-width — see `api_layer.credibility_gate.age_banding_design` in `config.yaml`: because mortality rate rises with age,
-younger ages need much wider age-bucket aggregation to reach actuarial credibility (roughly 1,082 expected deaths
-for full credibility) while older ages can often stay near single-year resolution, and the credible bucket width
-differs per `(state, sex, cause, race)` combination (population size, disease frequency, and demographic group size
-all change how much data volume exists at a given age). The plan is an offline precompute step that produces a
-small lookup table (filter combination → credible age scheme) that the API, dashboard, and LLM reporting layer all
-consult, rather than each computing credibility live — this keeps a Streamlit filter interaction fast (a lookup plus
-a pull of pre-aggregated data) instead of requiring per-request credibility math.
+gate's age axis specifically is planned as *adaptive per filter combination* rather than one fixed cutoff — see
+`api_layer.credibility_gate.age_banding_design` in `config.yaml`: because mortality rate rises with age, younger
+ages need much wider age-bucket aggregation to reach actuarial credibility (roughly 1,082 expected deaths for full
+credibility) while older ages can often stay near single-year resolution, and the credible resolution differs per
+`(state, sex, cause)` combination (population size and disease frequency each change how much data volume exists
+at a given age). Rather than sweeping a range of custom bucket widths, the resolved design is a binary choice per
+combination — single-year age, or the existing harmonized grouped-age scheme already in `harmonization.py`
+(`map_single_age`), restricted to the 20-84 bins: 20-24, 25-34, 35-44, 45-54, 55-64, 65-74, 75-84 — reusing
+already-tested binning code instead of new width-sweep logic. The testing grid is Location (5) x Sex (3) x Cause
+of death (6) = 90 combinations; the 15 All-causes combinations are expected to be single-year-credible everywhere,
+leaving the 75 individual-disease combinations as the real testing burden. The 20-24 bin (only 5 years wide) is
+expected to still fail credibility for the rarest disease/smallest-state combinations even after grouping — that's
+treated as a correct outcome to flag, not a gap requiring a third bucket width. The plan is an offline precompute
+step that produces a small lookup table (filter combination → credible age scheme) that the API, dashboard, and
+LLM reporting layer all consult, rather than each computing credibility live — this keeps a Streamlit filter
+interaction fast (a lookup plus a pull of pre-aggregated data) instead of requiring per-request credibility math.
 
 **`src/actuarial/eda.py`** (the planned location was `src/eda/`; it ended up colocated with the other actuarial
 modules instead, since it needs the same life-table columns) holds the analyst-facing diagnostics, deliberately
