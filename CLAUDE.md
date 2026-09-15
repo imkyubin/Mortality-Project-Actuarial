@@ -99,7 +99,16 @@ corresponding `ai_reporting`, `api_layer`, and `dashboard_strategy` sections of 
 these — they specify constraints (e.g., the RAG pipeline is simple year-range/cause-tag corpus matching, not a
 vector DB, and `api_layer.credibility_gate` requires the API to flag or suppress any filter combination whose
 underlying cell counts are CDC-suppressed or too small to trust, surfaced as an explicit message in the dashboard
-rather than a broken or misleading chart) that aren't visible from the empty stub files alone.
+rather than a broken or misleading chart) that aren't visible from the empty stub files alone. The credibility
+gate's age axis specifically is planned as *adaptive per filter combination* rather than one fixed cutoff or bucket
+width — see `api_layer.credibility_gate.age_banding_design` in `config.yaml`: because mortality rate rises with age,
+younger ages need much wider age-bucket aggregation to reach actuarial credibility (roughly 1,082 expected deaths
+for full credibility) while older ages can often stay near single-year resolution, and the credible bucket width
+differs per `(state, sex, cause, race)` combination (population size, disease frequency, and demographic group size
+all change how much data volume exists at a given age). The plan is an offline precompute step that produces a
+small lookup table (filter combination → credible age scheme) that the API, dashboard, and LLM reporting layer all
+consult, rather than each computing credibility live — this keeps a Streamlit filter interaction fast (a lookup plus
+a pull of pre-aggregated data) instead of requiring per-request credibility math.
 
 **`src/actuarial/eda.py`** (the planned location was `src/eda/`; it ended up colocated with the other actuarial
 modules instead, since it needs the same life-table columns) holds the analyst-facing diagnostics, deliberately
