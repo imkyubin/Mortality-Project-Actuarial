@@ -111,13 +111,30 @@ at a given age). Rather than sweeping a range of custom bucket widths, the resol
 combination — single-year age, or the existing harmonized grouped-age scheme already in `harmonization.py`
 (`map_single_age`), restricted to the 20-84 bins: 20-24, 25-34, 35-44, 45-54, 55-64, 65-74, 75-84 — reusing
 already-tested binning code instead of new width-sweep logic. The testing grid is Location (5) x Sex (3) x Cause
-of death (6) = 90 combinations; the 15 All-causes combinations are expected to be single-year-credible everywhere,
-leaving the 75 individual-disease combinations as the real testing burden. The 20-24 bin (only 5 years wide) is
-expected to still fail credibility for the rarest disease/smallest-state combinations even after grouping — that's
-treated as a correct outcome to flag, not a gap requiring a third bucket width. The plan is an offline precompute
-step that produces a small lookup table (filter combination → credible age scheme) that the API, dashboard, and
-LLM reporting layer all consult, rather than each computing credibility live — this keeps a Streamlit filter
-interaction fast (a lookup plus a pull of pre-aggregated data) instead of requiring per-request credibility math.
+of death (6) = 90 combinations, but each of the five diseases is now only tested within its own credible floor
+(`data_collection_strategy.resolved_decision.age_floor_by_cause` in `config.yaml`) rather than the full 20-84 —
+Heart disease/Cancer from 45-84, Cerebrovascular disease/COPD/COVID-19 from 55-84 — since those ages genuinely
+have low incidence for these five diseases of aging, not merely suppressed data. This is a display/credibility
+decision for the state/cause dashboard and API layer only; it does not change `workflow.step_2_modern_single_age_
+model`'s Lee-Carter/Poisson Lee-Carter fit, which stays national, all-cause, and 20-84 (`age_handling.
+primary_model_ages`) — a fully separate pipeline and dataset. The 15 All-causes combinations (full 20-84) are
+expected to be single-year-credible everywhere. Even within each cause's own floor, the youngest surviving bin may
+still fail credibility for the rarest disease in the smallest state — treated as a correct outcome to flag, not a
+gap to close. The plan is an offline precompute step that produces a small lookup table (filter combination →
+credible age scheme) that the API, dashboard, and LLM reporting layer all consult, rather than each computing
+credibility live — this keeps a Streamlit filter interaction fast (a lookup plus a pull of pre-aggregated data)
+instead of requiring per-request credibility math.
+
+Ages below each cause's floor were dropped from this grid, not banded around — see `data_collection_strategy.
+resolved_decision.young_adult_mortality_expansion` in `config.yaml` for why: the chosen five are diseases of aging
+and were never going to be credible at ages 20-44 regardless of banding, but actuaries do care about working-age
+mortality through a different cause lens (pension/Social Security valuation needs mortality across the full working
+age range, and SOA/academic "deaths of despair" research has made this a live actuarial topic). An identified but
+not-yet-pulled expansion pairs Drug-induced deaths, Suicide, and Unintentional injuries/accidents (Homicide
+optional, flagged as more sensitive to present publicly) with an age range of roughly 20-44/54 — the range where
+those specific causes are the actual leading drivers of death, so counts should be large rather than suppressed,
+the inverse problem from the chosen five. These causes live under CDC WONDER's "Drug/Alcohol Induced Causes" and
+"Injury Intent and Mechanism" selectors, not the "ICD-10 113 Cause List" used for the chosen five.
 
 **`src/actuarial/eda.py`** (the planned location was `src/eda/`; it ended up colocated with the other actuarial
 modules instead, since it needs the same life-table columns) holds the analyst-facing diagnostics, deliberately

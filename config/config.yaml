@@ -224,12 +224,34 @@ data_collection_strategy:
     chosen:
       - "Locations: United States (baseline) plus California, Texas, Florida, New York — the actual top 4 most populous states per 2024 Census estimates. Illinois (originally listed) was dropped since it is the 6th most populous state, not top 5."
       - "Causes of death: All causes (baseline) plus Heart disease, Cancer, Cerebrovascular disease (stroke), Chronic lower respiratory disease, and COVID-19. The first four are high-volume causes stable across the full 1999-2024 window; COVID-19 is included despite lower average volume because it is the central subject of the cross-subsection comparison this project is built around — its credibility should be judged against its actual 2020-2021 concentration, not averaged across the full panel."
+    age_floor_by_cause:
+      date: 2026-09-16
+      rationale: "These five causes (COVID-19 aside) are diseases of aging — incidence rises steeply with age by underlying epidemiology, not as an artifact of how the data was pulled. A uniform age floor across all five either wastes credibility headroom (heart disease/cancer are meaningful earlier) or still overreaches (stroke/COPD are genuinely rare before the mid-50s). This affects only the state/cause dashboard and API display layer — it does not change workflow.step_2_modern_single_age_model's Lee-Carter/Poisson Lee-Carter fit, which stays national, all-cause, and 20-84 (age_handling.primary_model_ages), an entirely separate pipeline and dataset."
+      floors:
+        - "All causes: 20-84 (unchanged, already credible at this range nationally)."
+        - "Heart disease: 45-84 — meaningful incidence by the 40s, especially male."
+        - "Cancer: 45-84 — several major cancers already screened starting around this age; real incidence by then."
+        - "Cerebrovascular disease (stroke): 55-84 — incidence rises much more sharply after the mid-50s; rare below that."
+        - "Chronic lower respiratory disease (COPD): 55-84 — tied to decades of cumulative exposure; very rare before 50s."
+        - "COVID-19: 55-84 for state-level credibility, though some middle-age (45-54) divergence signal may survive at the national level; fatality risk scaled steeply with age and comorbidity."
     deferred:
-      - "Suicide, Drug-induced deaths, Diabetes, Alzheimer's disease, External causes/accidents: back-of-envelope volume estimates (e.g., Illinois suicide deaths spread across single-year ages 20-84 land near ~14 deaths/cell, at CDC WONDER's under-10 suppression threshold) show these would suppress heavily once crossed with state and single-year age. Deferred as future work, not rejected outright."
+      - "Diabetes, Alzheimer's disease: back-of-envelope volume estimates suggest these would suppress heavily once crossed with state and single-year age across the full 20-84 range, similar to the suicide/drug-induced example that originally motivated this deferral (see young_adult_mortality_expansion below for those). Diabetes and Alzheimer's are age-of-onset-late diseases like the chosen five, though, so a future expansion would use a similar 55-84-ish floor rather than the full age range, not the 20-44 floor used for the young-adult causes. Deferred as future work, not rejected outright."
       - "Hispanic origin: carries a documented data-quality concern independent of sample size — Hispanic origin on US death certificates is typically informant-reported rather than self-reported, a known contributor to the 'Hispanic mortality paradox' literature. Deferred, not rejected outright."
     narrowed_further:
       date: 2026-09-15
       change: "Race dropped from scope entirely (had been chosen on 2026-09-08 as an isolated Location x All-causes demographic tier, the 4-group Bridged Race scheme). Not a data-quality finding — a deliberate scope cut. The state/cause comparison scope is now exactly two crossed dimensions: Location x Sex x Cause of death, single-age (1999-2024) dataset only."
+    young_adult_mortality_expansion:
+      status: identified_not_yet_pulled
+      date: 2026-09-16
+      rationale: "The chosen five causes are diseases of aging and were never going to be credible at ages 20-44 regardless of age-banding — that's real epidemiology, not a suppression artifact to route around. Actuaries do care about working-age mortality (pension/Social Security valuation needs mortality across the full working-age range, and SOA/academic research on 'deaths of despair' has made young-adult mortality a live actuarial topic over the last decade), but through a different cause lens than chronic disease. Pairing cause to the age range where it actually dominates resolves the credibility problem on both ends instead of forcing one cause list across the whole age spectrum."
+      candidate_causes:
+        - "Drug-induced deaths (overdose) — the single most actuarially significant US mortality trend of the past 15 years for working-age adults; ties directly into the opioid epidemic 2015-2019 context note already planned for ai_reporting's curated corpus."
+        - "Suicide — large, well-documented state-level and sex variation; a strong comparison subject on its own."
+        - "Unintentional injuries/accidents — broader than overdose alone (includes motor vehicle deaths); historically the leading cause of death under ~45 before overdose overtook it in recent years, so the crossover itself is a real story. Note this overlaps with drug-induced deaths (many overdoses are classified as unintentional injuries) — fine to show both as separate lines, not to be summed as independent components of one total."
+        - "Homicide (assault) — optional; also concentrated in younger ages with real state variation, but more sensitive to present publicly than the other three. Consider leaving as a documented 'considered, not included' note rather than building it, unless there's a clear reason to."
+      suggested_age_range: "20-44, possibly extending to 54. This is the range where these specific causes are the actual leading drivers of death, so counts should be large rather than suppressed — the inverse problem from the chosen five."
+      wonder_ui_note: "These causes live in a different part of the CDC WONDER request form than the ICD-10 113 Cause List used for the chosen five — drug-induced deaths are under a separate 'Drug/Alcohol Induced Causes' selector, and suicide/homicide/accidents are under an 'Injury Intent and Mechanism' selector."
+      sex_note: "Sex is worth keeping as a full dimension here specifically because the differential is large and actuarially well-known — male suicide/overdose/accident rates run multiples of female rates."
 
 api_layer:
   status: scaffolded_not_implemented
@@ -252,8 +274,8 @@ api_layer:
       resolved_scheme:
         date: 2026-09-15
         decision: "Binary choice per (state, sex, cause) combination rather than a swept set of candidate bucket widths: single-year age, or the existing harmonized grouped-age scheme already implemented in harmonization.py (map_single_age), restricted to the bins that fall inside the 20-84 modeling range: 20-24, 25-34, 35-44, 45-54, 55-64, 65-74, 75-84. Chosen over a custom width sweep because it reuses already-implemented, already-tested binning logic instead of new candidate-width code."
-        testing_grid: "Location (5: US, California, Texas, Florida, New York) x Sex (3: Male, Female, Total) x Cause of death (6: All causes, Heart disease, Cancer, Cerebrovascular disease, Chronic lower respiratory disease, COVID-19) = 90 combinations, each evaluated for whether single-year age clears the soft-floor threshold or must fall back to the 7-bin harmonized grouping. The 15 All-causes combinations (5 locations x 3 sexes) are expected to clear single-year credibility everywhere, matching the existing national all-cause file; the 75 individual-disease combinations are where the real testing burden is."
-        known_limitation: "The harmonized scheme's 20-24 bin is only 5 years wide — narrower than the 15-20 year band the key_insight above suggests is needed at the youngest working ages — so it will not fully rescue the youngest-age, rarest-disease, smallest-state cells. Those specific (state, sex, cause) combinations at ages 20-24 (and possibly 25-34) are expected to remain flagged as not viable at either supported resolution; that is treated as a correct, honest outcome rather than a gap requiring a third custom bucket width."
+        testing_grid: "Location (5: US, California, Texas, Florida, New York) x Sex (3: Male, Female, Total) x Cause of death (6: All causes, Heart disease, Cancer, Cerebrovascular disease, Chronic lower respiratory disease, COVID-19) = 90 combinations, each evaluated for whether single-year age clears the soft-floor threshold or must fall back to the 7-bin harmonized grouping, within that cause's own age_floor_by_cause range rather than the full 20-84 (e.g. Heart disease/Cancer only need testing from 45-84; Cerebrovascular disease/COPD/COVID-19 only from 55-84). The 15 All-causes combinations (5 locations x 3 sexes, full 20-84) are expected to clear single-year credibility everywhere, matching the existing national all-cause file; the 75 individual-disease combinations, now restricted to their own credible floor rather than 20-84, are a substantially smaller testing burden than originally scoped."
+        known_limitation: "Even within each cause's own floor, the youngest surviving band (e.g. the 45-54 or 55-64 harmonized bin) may still fail credibility for the rarer of the five causes (cerebrovascular disease, COPD) in the smallest of the four states. Those specific (state, sex, cause) combinations are expected to remain flagged as not viable at either supported resolution at that age; that is treated as a correct, honest outcome rather than a gap requiring a third custom bucket width. See data_collection_strategy.resolved_decision.young_adult_mortality_expansion for why ages below each cause's floor were dropped from this grid entirely rather than banded around — they reflect genuinely low incidence for these five causes, not a suppression artifact."
       planned_mechanism:
         - "An offline precompute step (not a live API/dashboard calculation) evaluates each (state, sex, cause) combination against the two resolved_scheme options above."
         - "It materializes the two pre-aggregated tables (single-year and the 7-bin harmonized grouping), plus one small lookup table mapping each filter combination to whichever of the two is credible for it."
@@ -323,15 +345,19 @@ future_reporting_parameters:
     - Cerebrovascular disease (stroke)
     - Chronic lower respiratory disease
     - COVID-19
+  age_floor_by_cause_note: See data_collection_strategy.resolved_decision.age_floor_by_cause — the age range above (20-84) applies only to All causes; the five diseases each have their own credible floor (45-84 or 55-84), not the full range.
   superseded_from_aspirational_set:
     locations_dropped:
       - Illinois
     causes_dropped:
       - Diabetes
       - Alzheimer's disease
-      - Drug-induced deaths
-      - External causes/accidents
-      - Suicide
+    causes_moved_to_young_adult_expansion:
+      note: See data_collection_strategy.resolved_decision.young_adult_mortality_expansion — identified as a better fit for a 20-44/54 age range under a different cause lens than the chosen five, not simply dropped.
+      causes:
+        - Drug-induced deaths
+        - External causes/accidents
+        - Suicide
     demographics_dropped:
       - Race
       - Hispanic origin
