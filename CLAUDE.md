@@ -110,31 +110,49 @@ credibility) while older ages can often stay near single-year resolution, and th
 at a given age). Rather than sweeping a range of custom bucket widths, the resolved design is a binary choice per
 combination — single-year age, or the existing harmonized grouped-age scheme already in `harmonization.py`
 (`map_single_age`), restricted to the 20-84 bins: 20-24, 25-34, 35-44, 45-54, 55-64, 65-74, 75-84 — reusing
-already-tested binning code instead of new width-sweep logic. The testing grid is Location (5) x Sex (3) x Cause
-of death (6) = 90 combinations, but each of the five diseases is now only tested within its own credible floor
-(`data_collection_strategy.resolved_decision.age_floor_by_cause` in `config.yaml`) rather than the full 20-84 —
-Heart disease/Cancer from 45-84, Cerebrovascular disease/COPD/COVID-19 from 55-84 — since those ages genuinely
-have low incidence for these five diseases of aging, not merely suppressed data. This is a display/credibility
-decision for the state/cause dashboard and API layer only; it does not change `workflow.step_2_modern_single_age_
-model`'s Lee-Carter/Poisson Lee-Carter fit, which stays national, all-cause, and 20-84 (`age_handling.
-primary_model_ages`) — a fully separate pipeline and dataset. The 15 All-causes combinations (full 20-84) are
-expected to be single-year-credible everywhere. Even within each cause's own floor, the youngest surviving bin may
-still fail credibility for the rarest disease in the smallest state — treated as a correct outcome to flag, not a
-gap to close. The plan is an offline precompute step that produces a small lookup table (filter combination →
-credible age scheme) that the API, dashboard, and LLM reporting layer all consult, rather than each computing
-credibility live — this keeps a Streamlit filter interaction fast (a lookup plus a pull of pre-aggregated data)
-instead of requiring per-request credibility math.
+already-tested binning code instead of new width-sweep logic. As of 2026-09-15 the modeled cause set is six diseases
+of aging — Heart disease, Cancer, Cerebrovascular disease, COPD, Diabetes mellitus, and Alzheimer's disease —
+plus All causes; COVID-19 was dropped from this set (see below) and Diabetes/Alzheimer's were promoted into it.
+The testing grid is Location (5) x Sex (3) x Cause of death (7) = 105 combinations, but each disease is only
+tested within its own credible floor (`data_collection_strategy.resolved_decision.age_floor_by_cause` in
+`config.yaml`) rather than the full 20-84 — Heart disease/Cancer from 45-84, Cerebrovascular disease/COPD/Diabetes
+from 55-84, Alzheimer's from 70-84 — since those ages genuinely have low incidence for these diseases of aging,
+not merely suppressed data. This is a display/credibility decision for the state/cause dashboard and API layer
+only; it does not change `workflow.step_2_modern_single_age_model`'s Lee-Carter/Poisson Lee-Carter fit, which stays
+national, all-cause, and 20-84 (`age_handling.primary_model_ages`) — a fully separate pipeline and dataset. The 15
+All-causes combinations (full 20-84) are expected to be single-year-credible everywhere. Even within each cause's
+own floor, the youngest surviving bin may still fail credibility for the rarest disease in the smallest state —
+treated as a correct outcome to flag, not a gap to close. The plan is an offline precompute step that produces a
+small lookup table (filter combination → credible age scheme) that the API, dashboard, and LLM reporting layer all
+consult, rather than each computing credibility live — this keeps a Streamlit filter interaction fast (a lookup
+plus a pull of pre-aggregated data) instead of requiring per-request credibility math. Per
+`age_floor_by_cause.validation_note` in `config.yaml`, this precompute step must check two things before a floor is
+treated as final, not one: the credibility standard above, and `src/actuarial/lee_carter.py:lc_variance_explained`
+confirming a single-component fit actually captures most of the variance at that age range (credibility alone
+doesn't guarantee Lee-Carter's structural assumption holds). This validation work is meant to happen before the
+state/cause dashboard subsection is built, not alongside it — the general national historic-trend dashboard view
+has no such dependency and can proceed in parallel.
 
-Ages below each cause's floor were dropped from this grid, not banded around — see `data_collection_strategy.
-resolved_decision.young_adult_mortality_expansion` in `config.yaml` for why: the chosen five are diseases of aging
-and were never going to be credible at ages 20-44 regardless of banding, but actuaries do care about working-age
-mortality through a different cause lens (pension/Social Security valuation needs mortality across the full working
-age range, and SOA/academic "deaths of despair" research has made this a live actuarial topic). An identified but
-not-yet-pulled expansion pairs Drug-induced deaths, Suicide, and Unintentional injuries/accidents (Homicide
-optional, flagged as more sensitive to present publicly) with an age range of roughly 20-44/54 — the range where
-those specific causes are the actual leading drivers of death, so counts should be large rather than suppressed,
-the inverse problem from the chosen five. These causes live under CDC WONDER's "Drug/Alcohol Induced Causes" and
-"Injury Intent and Mechanism" selectors, not the "ICD-10 113 Cause List" used for the chosen five.
+**COVID-19 was dropped from the modeled cause set (2026-09-15)**: it is a multi-year mortality shock (2020-2022),
+not a secular trend, and breaks the random-walk-with-drift `kt` assumption the same way at the sublevel as
+nationally — no amount of age-banding fixes that. It may still appear as raw historical/display-only data outside
+the modeled set, but it is not one of the six causes Poisson Lee-Carter is fit to. Diabetes and Alzheimer's disease
+were promoted into the modeled set in its place, since both are age-of-onset-late diseases in the same Gompertz-like
+family as the other four (see the floors above) — see `future_reporting_parameters.superseded_from_aspirational_set`
+for the before/after cause lists. Influenza & Pneumonia and Nephritis/kidney disease were also identified as
+possible further additions but are deferred, not tested (`data_collection_strategy.resolved_decision.deferred`).
+
+**A separate younger-age, different-cause-lens expansion (drug-induced deaths, suicide, unintentional injuries) was
+considered and then dropped from scope entirely (2026-09-15)** — see
+`data_collection_strategy.resolved_decision.young_adult_mortality_expansion` in `config.yaml`, kept for the record
+rather than deleted. The reasoning: those causes have a non-monotonic age-hump shape rather than the smooth,
+Gompertz-like pattern the six chosen diseases share, so Lee-Carter's single-factor assumption doesn't fit them —
+modeling them would need a different model family (e.g. a Poisson GAM, or a gradient-boosted model). A
+gradient-boosted approach was specifically considered and rejected for forecasting: tree-based models don't
+extrapolate past the range of their training data, so a "Year" feature just predicts values from the nearest
+training leaf instead of continuing a trend — disqualifying for a forecast regardless of how well it fits the
+age shape. Maintaining a second model family for a small slice of scope was judged not worth it; the project now
+stays entirely within one Poisson Lee-Carter approach across all modeled causes.
 
 **`src/actuarial/eda.py`** (the planned location was `src/eda/`; it ended up colocated with the other actuarial
 modules instead, since it needs the same life-table columns) holds the analyst-facing diagnostics, deliberately
