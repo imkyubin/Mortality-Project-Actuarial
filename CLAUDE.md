@@ -133,6 +133,26 @@ doesn't guarantee Lee-Carter's structural assumption holds). This validation wor
 state/cause dashboard subsection is built, not alongside it — the general national historic-trend dashboard view
 has no such dependency and can proceed in parallel.
 
+**Sublevel decision procedure (2026-09-17)**, the finalized per-(state, sex, cause) rule this precompute step
+implements — full detail in `data_collection_strategy.resolved_decision.age_floor_by_cause.sublevel_decision_procedure`
+in `config.yaml`: the 1,082-death credibility check is a strict binary pass/fail per age cell, applied with no
+exception for near-misses (a cell at 1,000 fails exactly like one at 500) — a deliberate choice of simplicity and
+auditability over a formal partial-credibility (`Z = sqrt(n/n_full)`) blend. Single-year age is tried first across
+the cause's full floor; if every cell clears 1,082 the combination stays single-year, otherwise the *whole*
+combination (never a per-cell mix) switches to the 7-bin harmonized grouping, since `lc_matrix` needs one uniform
+age axis. If grouped bins still fail, the oldest failing bin and everything younger than it get dropped, keeping
+only the contiguous surviving range up to 75-84 (truncating from the young end only, since all six causes are
+Gompertz-like and failures cluster there) — if even 75-84 fails, the whole combination is dropped. Before trusting
+a truncated range, it must also clear a structural minimum (at least 3 surviving grouped bins, a practical
+judgment call rather than a sourced standard) and then `lc_variance_explained`, benchmarked against the same
+metric on the already-validated national all-cause fit rather than an arbitrary fixed percentage. Pooling across
+calendar years to rescue a low-count sublevel was considered and explicitly rejected, since `kt` is the year-by-year
+signal the project exists to estimate — only the age axis is ever widened for credibility. The precompute step must
+retain the full audit trail as three tables, not just the final lookup: (1) single-year pass/fail per age, (2)
+grouped-bin pass/fail per age group, (3) the final rollup per combination recording resolution used, truncation
+extent, and variance-explained — tables 1-2 are the evidence a reviewer needs to see *why* a combination was
+truncated or dropped, not just that it was.
+
 **COVID-19 was dropped from the modeled cause set (2026-09-15)**: it is a multi-year mortality shock (2020-2022),
 not a secular trend, and breaks the random-walk-with-drift `kt` assumption the same way at the sublevel as
 nationally — no amount of age-banding fixes that. It may still appear as raw historical/display-only data outside
