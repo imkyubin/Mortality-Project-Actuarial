@@ -1,3 +1,9 @@
 __pycache__/
 *.py[cod]
 .vscode/
+
+# CDC WONDER raw numerical data must not be redistributed publicly - local use only
+data/raw/*.csv
+data/processed/*.csv
+Phase1_Hands_On/Data/Raw/*.csv
+Phase1_Hands_On/Data/Processed/*.csv
