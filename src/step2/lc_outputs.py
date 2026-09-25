@@ -4,7 +4,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.colors import TwoSlopeNorm
 
-from src.actuarial.life_table import add_life_tab_col
+from src.step2.life_table import add_life_tab_col
 
 def reconstruct_lc(ax, bx, kt):
     fitted_ln_mx = ax[:, None] + np.outer(bx, kt)

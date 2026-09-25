@@ -1,8 +1,8 @@
 import numpy as np
 import pandas as pd
 
-from src.actuarial.lee_carter import fit_lee_carter
-from src.actuarial.lc_outputs import reconstruct_lc, build_lc_tables 
+from src.step2.lee_carter import fit_lee_carter
+from src.step2.lc_outputs import reconstruct_lc, build_lc_tables 
 
 def death_exposure_matrix(df, sex_code):
     df_model = df[

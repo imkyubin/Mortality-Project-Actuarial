@@ -3,7 +3,7 @@ import pandas as pd
 
 import matplotlib.pyplot as plt
 
-from src.actuarial.life_table import add_life_tab_col
+from src.step2.life_table import add_life_tab_col
 
 def calculate_kt_changes(year_all):
     year_sorted = year_all.sort_values(['Sex Code', 'year']).copy()

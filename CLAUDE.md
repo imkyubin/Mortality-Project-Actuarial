@@ -60,12 +60,12 @@ deaths were deferred rather than built into the first version (Race was chosen o
 demographic tier, then dropped from scope entirely on 2026-09-15 — a deliberate scope cut, not a data-quality
 finding).
 
-**Actuarial layer (`src/actuarial/`)** builds life tables from cleaned deaths/population counts. The core
-recursion (in both `src/actuarial/life_table.py` and, not-yet-deduplicated, `scripts/step1_baseline_model_prototype.py`)
+**Actuarial layer (`src/step2/`)** builds life tables from cleaned deaths/population counts. The core
+recursion (in both `src/step2/life_table.py` and, not-yet-deduplicated, `scripts/step1_baseline_model_prototype.py`)
 is: `qx = Deaths/Population` → `px = 1-qx` → recursive cohort survivors `lx` (starting at a `RADIX`, e.g. 100000,
 per `Year Code`/`Sex Code` group, walked in increasing age order) → `dx = qx*lx` → `Lx = lx - 0.5*dx` → `Tx`
 (reverse-cumulative sum of `Lx` within each year/sex group) → `ex = Tx/lx`. Rows **must** be sorted by
-year, sex, then increasing age before calling this (see `src/actuarial/load_filter.py:load_filter`), since the
+year, sex, then increasing age before calling this (see `src/step2/load_filter.py:load_filter`), since the
 `lx`/`Tx` recursions rely on row order, not on the age values themselves. `lee_carter.py` now has a working
 SVD-based fit, fit diagnostics, and an Actual/Expected (A/E) validation layer (see the dedicated section below);
 `poisson_lee_carter.py` now also has a working Newton-Raphson-calibrated Poisson MLE `kt` fit (`fit_poisson_lc_all`,
@@ -92,11 +92,11 @@ the state/cause pull below lands, since those combinations will suppress routine
 (plain `Deaths` sum, no suppression propagation) that isn't triggered yet but would need fixing before that
 function ever sees suppressible data.
 
-**Downstream layers are scaffolded but not implemented**: `src/api/` (FastAPI, meant to filter processed data/model
-outputs by cause, age range, sex, location, year for the dashboard and reporting layer), `src/reporting/` (grounded
+**Downstream layers are scaffolded but not implemented**: `src/step3/api/` (FastAPI, meant to filter processed data/model
+outputs by cause, age range, sex, location, year for the dashboard and reporting layer), `src/step3/reporting/` (grounded
 LLM commentary — must only narrate precomputed statistics plus a small curated context corpus, never invent numbers
 or replace the model; all output must carry the disclaimer "AI-generated interpretation - actuarial review required
-before client or external use"), and `src/visualization/` (plots + Power BI/Tableau-ready CSV exports). Read the
+before client or external use"), and `src/step3/visualization/` (plots + Power BI/Tableau-ready CSV exports). Read the
 corresponding `ai_reporting`, `api_layer`, and `dashboard_strategy` sections of `config.yaml` before implementing
 these — they specify constraints (e.g., the RAG pipeline is simple year-range/cause-tag corpus matching, not a
 vector DB, and `api_layer.credibility_gate` requires the API to flag or suppress any filter combination whose
@@ -110,24 +110,32 @@ credibility) while older ages can often stay near single-year resolution, and th
 at a given age). Rather than sweeping a range of custom bucket widths, the resolved design is a binary choice per
 combination — single-year age, or the existing harmonized grouped-age scheme already in `harmonization.py`
 (`map_single_age`), restricted to the 20-84 bins: 20-24, 25-34, 35-44, 45-54, 55-64, 65-74, 75-84 — reusing
-already-tested binning code instead of new width-sweep logic. As of 2026-09-15 the modeled cause set is six diseases
-of aging — Heart disease, Cancer, Cerebrovascular disease, COPD, Diabetes mellitus, and Alzheimer's disease —
-plus All causes; COVID-19 was dropped from this set (see below) and Diabetes/Alzheimer's were promoted into it.
-The testing grid is Location (5) x Sex (3) x Cause of death (7) = 105 combinations, but each disease is only
-tested within its own credible floor (`data_collection_strategy.resolved_decision.age_floor_by_cause` in
-`config.yaml`) rather than the full 20-84 — Heart disease/Cancer from 45-84, Cerebrovascular disease/COPD/Diabetes
-from 55-84, Alzheimer's from 70-84 — since those ages genuinely have low incidence for these diseases of aging,
-not merely suppressed data. This is a display/credibility decision for the state/cause dashboard and API layer
-only; it does not change `workflow.step_2_modern_single_age_model`'s Lee-Carter/Poisson Lee-Carter fit, which stays
-national, all-cause, and 20-84 (`age_handling.primary_model_ages`) — a fully separate pipeline and dataset. The 15
-All-causes combinations (full 20-84) are expected to be single-year-credible everywhere. Even within each cause's
-own floor, the youngest surviving bin may still fail credibility for the rarest disease in the smallest state —
-treated as a correct outcome to flag, not a gap to close. The plan is an offline precompute step that produces a
+already-tested binning code instead of new width-sweep logic. As of 2026-09-24 the modeled cause set is eight
+diseases — Heart disease, Cancer, Cerebrovascular disease, COPD, Diabetes mellitus, Alzheimer's disease, Influenza &
+Pneumonia, and Chronic liver disease & cirrhosis — plus All causes; COVID-19 was dropped (see below),
+Diabetes/Alzheimer's were promoted in on 2026-09-15, and Influenza/Chronic liver disease were added on 2026-09-24.
+The last two are not clean Gompertz-like fits (flu has a 2020-2021 COVID-era dip; liver disease is hump-shaped by
+age with a rising young-adult trend) but go through the same mechanical procedure as every other cause —
+`lc_variance_explained` decides whether a single-factor fit holds for them, not a per-disease judgment call. A hump
+in the age *level* is not itself a Lee-Carter problem (`ax` is free per age); ages trending in opposite directions
+over time is. The testing grid is Location (5) x Sex (3) x Cause of death (9) = 135 combinations, but each disease
+is only tested within its own credible floor (`data_collection_strategy.resolved_decision.age_floor_by_cause` in
+`config.yaml`) rather than the full 20-84 — Chronic liver disease from 35-84, Heart disease/Cancer from 45-84,
+Cerebrovascular disease/COPD/Diabetes/Influenza & Pneumonia from 55-84, Alzheimer's from 70-84 — since those ages
+genuinely have low incidence for these diseases, not merely suppressed data. Floors must sit on a harmonized bin
+edge (20/25/35/45/55/65/75) and be 55 or younger to leave the 3 grouped bins `structural_minimum` requires;
+Alzheimer's 70 floor currently violates both (open item, see `age_floor_by_cause.bin_alignment_note`). This is a
+display/credibility decision for the state/cause dashboard and API layer only; it does not change
+`workflow.step_2_modern_single_age_model`'s Lee-Carter/Poisson Lee-Carter fit, which stays national, all-cause, and
+20-84 (`age_handling.primary_model_ages`) — a fully separate pipeline and dataset. Of the 15 All-causes combinations
+(full 20-84), only United States Male and Total actually clear single-year credibility in the data; the rest fall
+back to grouping. Even within each cause's own floor, the youngest surviving bin may still fail credibility for the
+rarest disease in the smallest state — treated as a correct outcome to flag, not a gap to close. The plan is an offline precompute step that produces a
 small lookup table (filter combination → credible age scheme) that the API, dashboard, and LLM reporting layer all
 consult, rather than each computing credibility live — this keeps a Streamlit filter interaction fast (a lookup
 plus a pull of pre-aggregated data) instead of requiring per-request credibility math. Per
 `age_floor_by_cause.validation_note` in `config.yaml`, this precompute step must check two things before a floor is
-treated as final, not one: the credibility standard above, and `src/actuarial/lee_carter.py:lc_variance_explained`
+treated as final, not one: the credibility standard above, and `src/step2/lee_carter.py:lc_variance_explained`
 confirming a single-component fit actually captures most of the variance at that age range (credibility alone
 doesn't guarantee Lee-Carter's structural assumption holds). This validation work is meant to happen before the
 state/cause dashboard subsection is built, not alongside it — the general national historic-trend dashboard view
@@ -141,11 +149,19 @@ auditability over a formal partial-credibility (`Z = sqrt(n/n_full)`) blend. Sin
 the cause's full floor; if every cell clears 1,082 the combination stays single-year, otherwise the *whole*
 combination (never a per-cell mix) switches to the 7-bin harmonized grouping, since `lc_matrix` needs one uniform
 age axis. If grouped bins still fail, the oldest failing bin and everything younger than it get dropped, keeping
-only the contiguous surviving range up to 75-84 (truncating from the young end only, since all six causes are
-Gompertz-like and failures cluster there) — if even 75-84 fails, the whole combination is dropped. Before trusting
+only the contiguous surviving range up to 75-84 (truncating from the young end only, since most modeled causes are
+Gompertz-like and failures cluster there) — if even 75-84 fails, the whole combination is dropped. This young-end
+rule, not Poisson Lee-Carter itself, is what assumes deaths rise with age; Chronic liver disease's hump breaks it
+and is accepted for simplicity (currently moot: only the US liver combinations clear 1,082, and all their bins pass).
+A cell must clear 1,082 in *every* year, so one low year (e.g. flu's 2020-2021 dip) removes that bin for all years —
+also accepted, but must be disclosed in reporting. The procedure is deliberately mechanical (no near-miss exceptions,
+custom age groups, or per-disease rule variants beyond the one-time floor); see `simplicity_stance` for why this is
+judged actuarially defensible. Before trusting
 a truncated range, it must also clear a structural minimum (at least 3 surviving grouped bins, a practical
 judgment call rather than a sourced standard) and then `lc_variance_explained`, benchmarked against the same
-metric on the already-validated national all-cause fit rather than an arbitrary fixed percentage. Pooling across
+metric on the already-validated national all-cause fit rather than an arbitrary fixed percentage — a combination
+passes if its first-component share is at least the same-sex national benchmark minus 0.05 (`VARIANCE_TOLERANCE`,
+fixed 2026-09-24; the benchmark itself is only ~0.58-0.61, so in practice this only binds on All-causes combinations). Pooling across
 calendar years to rescue a low-count sublevel was considered and explicitly rejected, since `kt` is the year-by-year
 signal the project exists to estimate — only the age axis is ever widened for credibility. The precompute step must
 retain the full audit trail as three tables, not just the final lookup: (1) single-year pass/fail per age, (2)
@@ -153,14 +169,25 @@ grouped-bin pass/fail per age group, (3) the final rollup per combination record
 extent, and variance-explained — tables 1-2 are the evidence a reviewer needs to see *why* a combination was
 truncated or dropped, not just that it was.
 
+**This procedure is built (2026-09-24)** in `scripts/step3/sublevel_validation.py` (`run_validation`; run with
+`python -m scripts.step3.sublevel_validation`, reads `data/processed/final.csv`). Pipeline: `apply_age_floors` →
+`count_validation` (single-year test, grouped fallback via `into_group`) → `years_validation` (young-end
+truncation) → `dim_validation` (backstop: every year present, unbroken age range) → `min_groups_validation`
+(at least 3 groups) → `variance_validation`. Each combination is reindexed to a full age × year grid, so a missing
+or NaN (suppressed) cell becomes 0 deaths and fails rather than silently leaving a hole. Outputs in
+`data/processed/`: `single_age_final.csv`/`grouped_age_final.csv` (model-ready), `validation_report.csv` (table 3,
+with a `Drop Reason` per dropped combination), `audit_single_age.csv` (table 1), `audit_grouped_age.csv` (table 2),
+`dim_flags.csv`. Current result: 5 single-year, 55 grouped, 75 dropped of 135; Alzheimer's is dropped everywhere
+because of its unaligned 70 floor (open decision, `age_floor_by_cause.bin_alignment_note`).
+
 **COVID-19 was dropped from the modeled cause set (2026-09-15)**: it is a multi-year mortality shock (2020-2022),
 not a secular trend, and breaks the random-walk-with-drift `kt` assumption the same way at the sublevel as
 nationally — no amount of age-banding fixes that. It may still appear as raw historical/display-only data outside
-the modeled set, but it is not one of the six causes Poisson Lee-Carter is fit to. Diabetes and Alzheimer's disease
+the modeled set, but it is not one of the causes Poisson Lee-Carter is fit to. Diabetes and Alzheimer's disease
 were promoted into the modeled set in its place, since both are age-of-onset-late diseases in the same Gompertz-like
 family as the other four (see the floors above) — see `future_reporting_parameters.superseded_from_aspirational_set`
-for the before/after cause lists. Influenza & Pneumonia and Nephritis/kidney disease were also identified as
-possible further additions but are deferred, not tested (`data_collection_strategy.resolved_decision.deferred`).
+for the before/after cause lists. Influenza & Pneumonia was later added (2026-09-24, see above); Nephritis/kidney
+disease remains deferred, not tested (`data_collection_strategy.resolved_decision.deferred`).
 
 **A separate younger-age, different-cause-lens expansion (drug-induced deaths, suicide, unintentional injuries) was
 considered and then dropped from scope entirely (2026-09-15)** — see
@@ -174,9 +201,9 @@ training leaf instead of continuing a trend — disqualifying for a forecast reg
 age shape. Maintaining a second model family for a small slice of scope was judged not worth it; the project now
 stays entirely within one Poisson Lee-Carter approach across all modeled causes.
 
-**`src/actuarial/eda.py`** (the planned location was `src/eda/`; it ended up colocated with the other actuarial
+**`src/step2/eda.py`** (the planned location was `src/eda/`; it ended up colocated with the other actuarial
 modules instead, since it needs the same life-table columns) holds the analyst-facing diagnostics, deliberately
-separate from `src/visualization/` (dashboard/export-ready output): `plot_crude_mortality_surface` (raw pre-
+separate from `src/step3/visualization/` (dashboard/export-ready output): `plot_crude_mortality_surface` (raw pre-
 graduation mortality surface, sequential colormap), `plot_progression_eda` (mortality curve or survival curve by
 age, one line per year — handles both dataset shapes), `top_n_ex`/`plot_top_ex` (ranks ages by life-expectancy
 trend slope, plots the most-improving and most-declining automatically), and `pct_change_qx`/`plot_pct_heatmap`
@@ -189,9 +216,33 @@ are dashboard-facing versus internal-only.
 a validation reference for spot-checking Python outputs against known-correct formulas — not part of the active
 pipeline.
 
+## Streamlit dashboard — templates only; the user builds the real one
+
+**The user is writing the Streamlit dashboard themselves (decided 2026-09-24).** `templates/dashboard/` holds a
+working reference version Claude built first (both `dashboard_strategy` views), kept as a template to learn from,
+not as the implementation. Don't write or port the real dashboard code into `src/` unless asked — explain,
+review, or point at the template instead. Run the template with
+`python -m streamlit run templates/dashboard/streamlit_app.py` from the repo root (`python -m` puts the repo root on
+`sys.path` so `src` and `templates` import).
+
+Template layout: `streamlit_app.py` (`st.navigation` entry point), `data.py` (`st.cache_data` loaders, `CAUSE_LABELS`,
+and `lookup_combination`, which reads `validation_report.csv` as the credibility lookup), `charts.py` (a single Altair
+`line_chart` helper with hover tooltips; colors are fixed per entity via `SEX_COLORS`/`AGE_BAND_COLORS`/`color_scale`,
+so filtering never repaints a series), `historic_view.py` (View 1: harmonized 1968-2024, national, 20-84, temporary
+life expectancy to 85 plus death rate by age band), and `subsection_view.py` (View 2: state × sex × cause from
+`single_age_final.csv`/`grouped_age_final.csv`, with the age axis chosen by the combination's `Resolution`; a
+dropped combination shows its `Drop Reason` in place of a chart, and a young-end truncation is disclosed).
+
+**CDC WONDER display rule (the user's call, applies to the real dashboard too):** never display raw counts. No
+`Deaths` or `Population` values appear anywhere in the dashboard: no tables or `st.dataframe`, no count tooltips,
+and no audit tables (`audit_single_age.csv`/`audit_grouped_age.csv` hold per-cell minimum death counts, some under
+10). Show only derived values (rates per 100,000, life-table `ex`, variance explained) from cells that passed the
+credibility gate. This is stricter than CDC WONDER's own data-use rule, which bars publishing counts of 9 or fewer
+and rates based on them. The audit tables stay offline as project deliverables, not dashboard content.
+
 ## Whittaker-Henderson module (step 2) — current state
 
-`src/actuarial/whittaker_henderson.py` is done; also recorded in `config.yaml`
+`src/step2/whittaker_henderson.py` is done; also recorded in `config.yaml`
 `workflow.step_2_modern_single_age_model.whittaker_henderson_utility`. Function list, in dependency order:
 
 - `_second_difference_matrix(n)` — roughness-penalty matrix, reused by the fit itself and by the lambda elbow.
@@ -223,9 +274,9 @@ reference for how these functions compose.
 
 ## Lee-Carter / Poisson Lee-Carter — current state and planned visualizations
 
-`src/actuarial/lee_carter.py` (SVD-based fit) is now built out through the full non-forecasting A/E and
+`src/step2/lee_carter.py` (SVD-based fit) is now built out through the full non-forecasting A/E and
 e-at-age workflow; also recorded in `config.yaml` `workflow.step_2_modern_single_age_model.lee_carter_utility`.
-`src/actuarial/poisson_lee_carter.py` now also has a working Newton-Raphson-calibrated `kt` fit (the
+`src/step2/poisson_lee_carter.py` now also has a working Newton-Raphson-calibrated `kt` fit (the
 standard Brouhns/Denuit/Vermunt Poisson Lee-Carter MLE, which has no closed-form SVD solution and is
 solved iteratively): `death_exposure_matrix` pivots `Deaths`/`Population` into Year × Age matrices,
 `initial_guess` seeds `ax`/`bx`/`kt` off the SVD fit's `ln(mx_hat)`, `update_ax`/`update_bx`/`update_kt`
@@ -272,7 +323,7 @@ e-at-age comparison):
   (`life_table.py`), then plots fitted `ex` against the actual (unsmoothed) `ex` at `age` for every sex in
   the data, one figure per sex. Historical comparison only, distinct from the forecast e65 fan chart below.
 
-`src/actuarial/forecasting.py` — **done** through the kt forecast and e65 fan chart (ported and generalized
+`src/step2/forecasting.py` — **done** through the kt forecast and e65 fan chart (ported and generalized
 from `scripts/step1_baseline_model_prototype.py`'s single-sex `forecast_kt`/`plot_kt_forecast` prototype to
 handle both sexes via per-`Sex Code` loops, and to work off either the SVD or Poisson `kt` fit):
 

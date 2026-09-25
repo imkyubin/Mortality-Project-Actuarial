@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 
-from src.actuarial.lc_outputs import reconstruct_lc, build_lc_tables
+from src.step2.lc_outputs import reconstruct_lc, build_lc_tables
 
 def lc_matrix(df, sex_code):
     df_model = df[
