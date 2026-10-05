@@ -240,6 +240,16 @@ and no audit tables (`audit_single_age.csv`/`audit_grouped_age.csv` hold per-cel
 credibility gate. This is stricter than CDC WONDER's own data-use rule, which bars publishing counts of 9 or fewer
 and rates based on them. The audit tables stay offline as project deliverables, not dashboard content.
 
+**Historic page design (the user's real dashboard, `src/step3/dashboard/`, decided 2026-09-29)** — full detail in
+`dashboard_strategy.primary.historic_view_design` in `config.yaml`. Interactivity rule: every element must respond
+to the page's controls (From/To year selectboxes, Total/Female/Male radio); full-history charts keep 1968-2024 for
+context but visibly mark the selection (shaded From-To band, selected sex at full opacity, others faded) rather
+than ignoring it. Page contents: a 3-box metric row (done); 2a chance of reaching 85 over time (built, band and
+emphasis pending); 2b death rate per 100,000 by age group, log scale, filtered to the selected sex, with the same
+band; 2c average annual mortality improvement by age group over the From-To window, `1 - (rate_To/rate_From) **
+(1/(To-From))`, which replaced the originally-optional survival curve because improvement rates are how actuaries
+discuss mortality trend. The reach-85 figure is a period measure, not a cohort projection, and should be labeled so.
+
 ## Whittaker-Henderson module (step 2) — current state
 
 `src/step2/whittaker_henderson.py` is done; also recorded in `config.yaml`
