@@ -13,10 +13,10 @@ import altair as alt
 import pandas as pd
 import streamlit as st
 
-from src.step3.dashboard.charts import (
+from src.dashboard.charts import (
     CAUSE_COLORS, LOCATION_COLORS, PALETTE, color_scale, heatmap, improvement_bars, window_lines,
 )
-from src.step3.dashboard.data import (
+from src.dashboard.data import (
     AGE_LABELS, BENCHMARK, CAUSE_LABELS, CREDIBILITY_STANDARD, LOCATIONS, SEX_LABELS,
     STANDARD_YEAR, age_range_label, age_standardize, common_bands, comparison_rates,
     improvement_table, load_validation, lookup_combination, passed_combinations, pooled_rates,

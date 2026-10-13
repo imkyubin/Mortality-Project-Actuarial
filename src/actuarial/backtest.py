@@ -7,7 +7,7 @@ The dashboard trains on 1999-2014 so that 2015-2019 gives five pre-COVID holdout
 """
 import pandas as pd
 
-from src.step2.forecasting import (
+from src.actuarial.forecasting import (
     calculate_kt_changes,
     estimate_drift,
     forecast_kt,

@@ -22,12 +22,12 @@ placeholders — see `quality_bar.engineering_hygiene` in `config/config.yaml`).
 from the repo root so `src` resolves as a package:
 
 ```
-python -m scripts.data_cleaning_exploration
-python -m scripts.data_harmonization
+python -m scripts.national.clean_wonder_exports
+python -m scripts.national.harmonize_age_groups
 python scripts/step1_baseline_model_prototype.py
-python -m scripts.step3.sublevel_validation      # page 2 inputs (validation_report.csv, grouped/single finals)
-python -m scripts.step3.forecast_precompute      # page 3 inputs (data/processed/model/*.csv)
-python -m streamlit run src/step3/dashboard/streamlit_app.py
+python -m scripts.sublevel.validate_credibility      # page 2 inputs (validation_report.csv, grouped/single finals)
+python -m scripts.national.forecast_precompute      # page 3 inputs (data/processed/model/*.csv)
+python -m streamlit run src/dashboard/streamlit_app.py
 ```
 
 Dependencies observed in use (not yet pinned anywhere): `pandas`, `numpy`, `matplotlib`, `statsmodels`, `scipy`.
@@ -49,7 +49,7 @@ Pipeline: `data/raw/*.csv` → `src/data/wonder.py:load_wonder_csv` (strips CDC 
 normalize sex codes) → written to `data/processed/old_1968_1998.csv` and `data/processed/new_1999_2024.csv`. The
 new (single-age) data is then bucketed into the old data's age groups via `src/data/harmonization.py`
 (`map_single_age`, `add_harmonized_col`, `aggregate`) and concatenated into `data/processed/harmonized_1968-2024.csv`.
-Scripts in `scripts/` (`data_cleaning_exploration.py`, `data_harmonization.py`) currently drive this pipeline
+Scripts in `scripts/national/` (`clean_wonder_exports.py`, `harmonize_age_groups.py`) drive this pipeline
 end-to-end and double as the only working examples of how the `src/data/` functions compose.
 
 **Which processed file to use depends on the task**: `new_1999_2024.csv` (single-year ages, highest resolution,
@@ -63,12 +63,12 @@ deaths were deferred rather than built into the first version (Race was chosen o
 demographic tier, then dropped from scope entirely on 2026-09-15 — a deliberate scope cut, not a data-quality
 finding).
 
-**Actuarial layer (`src/step2/`)** builds life tables from cleaned deaths/population counts. The core
-recursion (in both `src/step2/life_table.py` and, not-yet-deduplicated, `scripts/step1_baseline_model_prototype.py`)
+**Actuarial layer (`src/actuarial/`)** builds life tables from cleaned deaths/population counts. The core
+recursion (in both `src/actuarial/life_table.py` and, not-yet-deduplicated, `scripts/step1_baseline_model_prototype.py`)
 is: `qx = Deaths/Population` → `px = 1-qx` → recursive cohort survivors `lx` (starting at a `RADIX`, e.g. 100000,
 per `Year Code`/`Sex Code` group, walked in increasing age order) → `dx = qx*lx` → `Lx = lx - 0.5*dx` → `Tx`
 (reverse-cumulative sum of `Lx` within each year/sex group) → `ex = Tx/lx`. Rows **must** be sorted by
-year, sex, then increasing age before calling this (see `src/step2/load_filter.py:load_filter`), since the
+year, sex, then increasing age before calling this (see `src/actuarial/load_filter.py:load_filter`), since the
 `lx`/`Tx` recursions rely on row order, not on the age values themselves. `lee_carter.py` now has a working
 SVD-based fit, fit diagnostics, and an Actual/Expected (A/E) validation layer (see the dedicated section below);
 `poisson_lee_carter.py` now also has a working Newton-Raphson-calibrated Poisson MLE `kt` fit (`fit_poisson_lc_all`,
@@ -76,7 +76,7 @@ mirroring `lee_carter.py`'s `age_all`/`year_all`/`fitted_all` shape so it plugs 
 `forecasting.py` functions) — see `workflow.step_2_modern_single_age_model.lee_carter_utility` in `config.yaml`.
 `forecasting.py` has drift-based `kt` forecasting with a 95% CI band (`forecast_kt`/`plot_kt_forecast`) and
 propagates that band through to an e65/e-at-age forecast fan chart (`project_ln_mx` → `forecast_ex_fan` →
-`plot_ex_fan_chart`), run for both the SVD and Poisson `kt` fits in `scripts/step2_all_dataset_model.py`.
+`plot_ex_fan_chart`), run for both the SVD and Poisson `kt` fits in `scripts/national/model_diagnostics.py`.
 Whichever model is treated as primary,
 validation must include an out-of-sample backtest — fit on a training
 window, forecast `kt` forward, and compare the forecast against actual holdout years — not just in-sample fit
@@ -88,18 +88,18 @@ for the current function list.
 **Known data-quality trap**: CDC WONDER suppresses death counts under 10 as the literal string `"Suppressed"`.
 `src/data/cleaning.py:flag_suppressed` now flags this explicitly (adds a `{column} Suppressed` boolean column)
 *before* `pd.to_numeric(errors="coerce")` turns it into an indistinguishable `NaN` — wired into
-`scripts/data_cleaning_exploration.py` right after `combine_datasets`, so both processed files carry the flag.
+`scripts/national/clean_wonder_exports.py` right after `combine_datasets`, so both processed files carry the flag.
 It's a no-op today (national all-cause single-age counts don't hit the under-10 threshold), but it matters once
 the state/cause pull below lands, since those combinations will suppress routinely. See
 `data.known_data_quality_risk` in `config.yaml` for a related unfixed gap in `harmonization.py`'s `aggregate()`
 (plain `Deaths` sum, no suppression propagation) that isn't triggered yet but would need fixing before that
 function ever sees suppressible data.
 
-**Downstream layers are scaffolded but not implemented**: `src/step3/api/` (FastAPI, meant to filter processed data/model
-outputs by cause, age range, sex, location, year for the dashboard and reporting layer), `src/step3/reporting/` (grounded
+**Downstream layers are scaffolded but not implemented**: `src/api/` (FastAPI, meant to filter processed data/model
+outputs by cause, age range, sex, location, year for the dashboard and reporting layer), `src/reporting/` (grounded
 LLM commentary — must only narrate precomputed statistics plus a small curated context corpus, never invent numbers
 or replace the model; all output must carry the disclaimer "AI-generated interpretation - actuarial review required
-before client or external use"), and `src/step3/visualization/` (plots + Power BI/Tableau-ready CSV exports). Read the
+before client or external use"), and `src/visualization/` (plots + Power BI/Tableau-ready CSV exports). Read the
 corresponding `ai_reporting`, `api_layer`, and `dashboard_strategy` sections of `config.yaml` before implementing
 these — they specify constraints (e.g., the RAG pipeline is simple year-range/cause-tag corpus matching, not a
 vector DB, and `api_layer.credibility_gate` requires the API to flag or suppress any filter combination whose
@@ -138,7 +138,7 @@ small lookup table (filter combination → credible age scheme) that the API, da
 consult, rather than each computing credibility live — this keeps a Streamlit filter interaction fast (a lookup
 plus a pull of pre-aggregated data) instead of requiring per-request credibility math. Per
 `age_floor_by_cause.validation_note` in `config.yaml`, this precompute step must check two things before a floor is
-treated as final, not one: the credibility standard above, and `src/step2/lee_carter.py:lc_variance_explained`
+treated as final, not one: the credibility standard above, and `src/actuarial/lee_carter.py:lc_variance_explained`
 confirming a single-component fit actually captures most of the variance at that age range (credibility alone
 doesn't guarantee Lee-Carter's structural assumption holds). This validation work is meant to happen before the
 state/cause dashboard subsection is built, not alongside it — the general national historic-trend dashboard view
@@ -172,8 +172,8 @@ grouped-bin pass/fail per age group, (3) the final rollup per combination record
 extent, and variance-explained — tables 1-2 are the evidence a reviewer needs to see *why* a combination was
 truncated or dropped, not just that it was.
 
-**This procedure is built (2026-09-24)** in `scripts/step3/sublevel_validation.py` (`run_validation`; run with
-`python -m scripts.step3.sublevel_validation`, reads `data/processed/final.csv`). Pipeline: `apply_age_floors` →
+**This procedure is built (2026-09-24)** in `scripts/sublevel/validate_credibility.py` (`run_validation`; run with
+`python -m scripts.sublevel.validate_credibility`, reads `data/processed/final.csv`). Pipeline: `apply_age_floors` →
 `count_validation` (single-year test, grouped fallback via `into_group`) → `years_validation` (young-end
 truncation) → `dim_validation` (backstop: every year present, unbroken age range) → `min_groups_validation`
 (at least 3 groups) → `variance_validation`. Each combination is reindexed to a full age × year grid, so a missing
@@ -204,9 +204,9 @@ training leaf instead of continuing a trend — disqualifying for a forecast reg
 age shape. Maintaining a second model family for a small slice of scope was judged not worth it; the project now
 stays entirely within one Poisson Lee-Carter approach across all modeled causes.
 
-**`src/step2/eda.py`** (the planned location was `src/eda/`; it ended up colocated with the other actuarial
+**`src/actuarial/eda.py`** (the planned location was `src/eda/`; it ended up colocated with the other actuarial
 modules instead, since it needs the same life-table columns) holds the analyst-facing diagnostics, deliberately
-separate from `src/step3/visualization/` (dashboard/export-ready output): `plot_crude_mortality_surface` (raw pre-
+separate from `src/visualization/` (dashboard/export-ready output): `plot_crude_mortality_surface` (raw pre-
 graduation mortality surface, sequential colormap), `plot_progression_eda` (mortality curve or survival curve by
 age, one line per year — handles both dataset shapes), `top_n_ex`/`plot_top_ex` (ranks ages by life-expectancy
 trend slope, plots the most-improving and most-declining automatically), and `pct_change_qx`/`plot_pct_heatmap`
@@ -219,13 +219,13 @@ are dashboard-facing versus internal-only.
 a validation reference for spot-checking Python outputs against known-correct formulas — not part of the active
 pipeline.
 
-## Streamlit dashboard (`src/step3/dashboard/`) — all three pages built
+## Streamlit dashboard (`src/dashboard/`) — all three pages built
 
-**Status (2026-10-13):** all three `dashboard_strategy` pages are complete in `src/step3/dashboard/`. Page 1 is the
+**Status (2026-10-13):** all three `dashboard_strategy` pages are complete in `src/dashboard/`. Page 1 is the
 user's own build; pages 2 and 3 were completed by Claude at the user's request (page 2 ported from the former
 `templates/dashboard/` reference, which was then deleted). Run from the repo root with
-`python -m streamlit run src/step3/dashboard/streamlit_app.py` (`python -m` puts the repo root on `sys.path` so
-`src` imports). Page 3 needs `python -m scripts.step3.forecast_precompute` run first.
+`python -m streamlit run src/dashboard/streamlit_app.py` (`python -m` puts the repo root on `sys.path` so
+`src` imports). Page 3 needs `python -m scripts.national.forecast_precompute` run first.
 
 **The user keeps learning Streamlit in a separate, standalone folder:** `../Mortality Dashboard Practice/` (next to
 this repo on the Desktop, not a git repo). It has its own copies of the data, the pipeline helpers
@@ -282,9 +282,9 @@ values (Total, 1999-2024, All causes): highest TX 774 (+2% vs US), lowest NY 619
 
 **Page 3, forecast (built 2026-10-13)** — full detail in `dashboard_strategy.primary.forecast_view_design`.
 Surfaces the step 2 Lee-Carter / Poisson Lee-Carter work. National, all-cause, single ages 20-84, by sex. Never fit
-live: `scripts/step3/forecast_precompute.py` (`run_precompute`, ~5 s) fits both models on both calibration windows
+live: `scripts/national/forecast_precompute.py` (`run_precompute`, ~5 s) fits both models on both calibration windows
 (1999-2024 and pre-COVID 1999-2019), forecasts to 2050, runs the 1999-2014 / 2015-2024 backtest
-(`src/step2/backtest.py`), and writes derived-only CSVs to `data/processed/model/` (`params`, `kt`, `summary`,
+(`src/actuarial/backtest.py`), and writes derived-only CSVs to `data/processed/model/` (`params`, `kt`, `summary`,
 `forecast_ex`, `actual_ex`, `ae_in_sample`, `backtest_ex`, `backtest_ae`, `backtest_error`; the script asserts no
 count column is written). Controls: sex, model (Poisson primary, SVD for comparison), starting age, horizon
 (2030-2050), calibration window. Tabs: **Forecast** (metric row with 95% interval and implied improvement; fan
@@ -310,7 +310,7 @@ concrete case for Poisson being primary. First-factor variance explained: ~0.61 
 
 ## Whittaker-Henderson module (step 2) — current state
 
-`src/step2/whittaker_henderson.py` is done; also recorded in `config.yaml`
+`src/actuarial/whittaker_henderson.py` is done; also recorded in `config.yaml`
 `workflow.step_2_modern_single_age_model.whittaker_henderson_utility`. Function list, in dependency order:
 
 - `_second_difference_matrix(n)` — roughness-penalty matrix, reused by the fit itself and by the lambda elbow.
@@ -337,14 +337,14 @@ concrete case for Poisson being primary. First-factor variance explained: ~0.61 
   with an automatic multi-slice ranking-and-plot layer instead, once it became clear that manually picking one
   slice at a time didn't scale to the full dataset.
 
-`scripts/step2_all_dataset_model.py` wires this (and `eda.py`, below) together end to end and is the working
+`scripts/national/model_diagnostics.py` wires this (and `eda.py`, below) together end to end and is the working
 reference for how these functions compose.
 
 ## Lee-Carter / Poisson Lee-Carter — current state and planned visualizations
 
-`src/step2/lee_carter.py` (SVD-based fit) is now built out through the full non-forecasting A/E and
+`src/actuarial/lee_carter.py` (SVD-based fit) is now built out through the full non-forecasting A/E and
 e-at-age workflow; also recorded in `config.yaml` `workflow.step_2_modern_single_age_model.lee_carter_utility`.
-`src/step2/poisson_lee_carter.py` now also has a working Newton-Raphson-calibrated `kt` fit (the
+`src/actuarial/poisson_lee_carter.py` now also has a working Newton-Raphson-calibrated `kt` fit (the
 standard Brouhns/Denuit/Vermunt Poisson Lee-Carter MLE, which has no closed-form SVD solution and is
 solved iteratively): `death_exposure_matrix` pivots `Deaths`/`Population` into Year × Age matrices,
 `initial_guess` seeds `ax`/`bx`/`kt` off the SVD fit's `ln(mx_hat)`, `update_ax`/`update_bx`/`update_kt`
@@ -354,7 +354,7 @@ enforces the usual `sum(bx)=1`/`mean(kt)=0` identification constraints each iter
 `lc_outputs.py`'s `reconstruct_lc`/`build_lc_tables`, so its `age_all`/`year_all`/`fitted_all` output has the
 exact same shape as `lee_carter.py`'s SVD fit — every downstream function (`ae_metric`, `ex_progression_plot`,
 everything in `forecasting.py` below) works unmodified on either fit's output, and
-`scripts/step2_all_dataset_model.py` now runs the full pipeline for both.
+`scripts/national/model_diagnostics.py` now runs the full pipeline for both.
 
 Function list, in the order they appear in the file (fit pipeline → fit diagnostics → A/E workflow →
 e-at-age comparison):
@@ -391,7 +391,7 @@ e-at-age comparison):
   (`life_table.py`), then plots fitted `ex` against the actual (unsmoothed) `ex` at `age` for every sex in
   the data, one figure per sex. Historical comparison only, distinct from the forecast e65 fan chart below.
 
-`src/step2/forecasting.py` — **done** through the kt forecast and e65 fan chart (ported and generalized
+`src/actuarial/forecasting.py` — **done** through the kt forecast and e65 fan chart (ported and generalized
 from `scripts/step1_baseline_model_prototype.py`'s single-sex `forecast_kt`/`plot_kt_forecast` prototype to
 handle both sexes via per-`Sex Code` loops, and to work off either the SVD or Poisson `kt` fit):
 
@@ -423,15 +423,15 @@ handle both sexes via per-`Sex Code` loops, and to work off either the SVD or Po
   sex. This is the number that actually gets presented to a non-technical audience (distinct from the
   historical `ex_progression_plot` above).
 
-Both are wired end-to-end for the SVD and Poisson `kt` fits in `scripts/step2_all_dataset_model.py`.
+Both are wired end-to-end for the SVD and Poisson `kt` fits in `scripts/national/model_diagnostics.py`.
 
 Still outstanding:
 - **Cumulative A/E deviation over time** — same spirit as `wh_worst_cumdev`, checking whether the
   Poisson-calibrated model systematically over/under-predicts deaths moving away from the fit window.
-- ~~**Out-of-sample backtest plot**~~ — **done 2026-10-13.** `src/step2/backtest.py`: `backtest(life_table,
+- ~~**Out-of-sample backtest plot**~~ — **done 2026-10-13.** `src/actuarial/backtest.py`: `backtest(life_table,
   fit_fn, train_end)` fits either model on years <= `train_end`, forecasts every holdout year, and returns forecast
   vs actual `ex` (with band and % error) per year × sex × age plus actual/expected deaths per holdout year;
-  `mean_abs_pct_error` summarizes a window. Run on 1999-2014 / 2015-2024 by `scripts/step3/forecast_precompute.py`
+  `mean_abs_pct_error` summarizes a window. Run on 1999-2014 / 2015-2024 by `scripts/national/forecast_precompute.py`
   and plotted on dashboard page 3's Backtest tab with COVID 2020-2021 called out as expected divergence. To
   support it, `forecast_ex_fan(..., age=None)` now returns the fan at every age (the default `age=65` is unchanged
   apart from an extra `Single-Year Ages Code` column).

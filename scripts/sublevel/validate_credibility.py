@@ -6,7 +6,7 @@ import pandas as pd
 from src.data.harmonization import (
     add_harmonized_col
 )
-from src.step2.lee_carter import lc_variance_explained
+from src.actuarial.lee_carter import lc_variance_explained
 
 """
 Sublevel decision procedure, per (Sex, State, Cause) combination — see

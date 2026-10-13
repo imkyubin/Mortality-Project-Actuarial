@@ -10,7 +10,7 @@ opacity, the rest faded.
 import altair as alt
 import pandas as pd
 
-from src.step2.load_filter import age_value
+from src.actuarial.load_filter import age_value
 
 PALETTE = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300", "#4a3aa7", "#e34948"]
 NEUTRAL = "#898781"

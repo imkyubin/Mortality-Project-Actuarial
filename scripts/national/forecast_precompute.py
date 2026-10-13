@@ -1,6 +1,6 @@
 """Offline precompute for the dashboard's forecast page (page 3).
 
-Run from the repo root: python -m scripts.step3.forecast_precompute
+Run from the repo root: python -m scripts.national.forecast_precompute
 
 Fits both models (Poisson Lee-Carter primary, SVD for comparison) on both calibration
 windows (1999-2024 and pre-COVID 1999-2019), forecasts to LAST_FORECAST_YEAR, runs the
@@ -16,13 +16,13 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from src.step2.load_filter import load_filter
-from src.step2.life_table import add_life_tab_col
-from src.step2.lee_carter import fit_lc_all, lc_matrix, lc_variance_explained
-from src.step2.poisson_lee_carter import fit_poisson_lc_all
-from src.step2.lc_outputs import ae_metric
-from src.step2.forecasting import calculate_kt_changes, estimate_drift, forecast_kt, project_ln_mx, forecast_ex_fan
-from src.step2.backtest import backtest, mean_abs_pct_error
+from src.actuarial.load_filter import load_filter
+from src.actuarial.life_table import add_life_tab_col
+from src.actuarial.lee_carter import fit_lc_all, lc_matrix, lc_variance_explained
+from src.actuarial.poisson_lee_carter import fit_poisson_lc_all
+from src.actuarial.lc_outputs import ae_metric
+from src.actuarial.forecasting import calculate_kt_changes, estimate_drift, forecast_kt, project_ln_mx, forecast_ex_fan
+from src.actuarial.backtest import backtest, mean_abs_pct_error
 
 PROCESSED = Path("data/processed")
 OUT = PROCESSED / "model"

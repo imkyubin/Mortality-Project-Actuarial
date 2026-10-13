@@ -1,13 +1,13 @@
 """Streamlit entry point.
 
-Run from the repo root: python -m streamlit run src/step3/dashboard/streamlit_app.py
+Run from the repo root: python -m streamlit run src/dashboard/streamlit_app.py
 (`python -m` puts the repo root on sys.path so `src` imports.)
 
-Page 3 reads data/processed/model/, written by: python -m scripts.step3.forecast_precompute
+Page 3 reads data/processed/model/, written by: python -m scripts.national.forecast_precompute
 """
 import streamlit as st
 
-from src.step3.dashboard import forecast_view, historic_view, subsection_view
+from src.dashboard import forecast_view, historic_view, subsection_view
 
 st.set_page_config(page_title="US Mortality Explorer", layout="wide")
 

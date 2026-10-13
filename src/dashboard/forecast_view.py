@@ -4,7 +4,7 @@ Design: dashboard_strategy.primary.forecast_view_design in config.yaml.
 Tabs: Forecast, Backtest, Model & limitations ("a credible forecast, then the evidence it
 can be trusted").
 
-- Nothing is fitted live: scripts/step3/forecast_precompute.py writes data/processed/model/.
+- Nothing is fitted live: scripts/national/forecast_precompute.py writes data/processed/model/.
 - Labeling rule: the life table stops at 84, so ex is "expected years lived from age x to 85",
   never "e65" or "life expectancy".
 - CDC WONDER display rule: parameters, ex, improvement rates and A/E ratios only.
@@ -13,10 +13,10 @@ import altair as alt
 import pandas as pd
 import streamlit as st
 
-from src.step3.dashboard.charts import (
+from src.dashboard.charts import (
     COVID_COLOR, NEUTRAL, PALETTE, SEX_COLORS, color_scale, fan_chart, series_lines,
 )
-from src.step3.dashboard.data import SEX_LABELS, load_model, model_slice
+from src.dashboard.data import SEX_LABELS, load_model, model_slice
 
 MODEL_LABELS = {"Poisson": "Poisson Lee-Carter", "SVD": "Lee-Carter (SVD)"}
 MODEL_COLORS = {"Poisson Lee-Carter": PALETTE[0], "Lee-Carter (SVD)": PALETTE[1]}

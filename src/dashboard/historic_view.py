@@ -6,8 +6,8 @@ import pandas as pd
 import streamlit as st
 import altair as alt
 
-from src.step3.dashboard.data import load_summary, load_historic
-from src.step2.load_filter import age_value
+from src.dashboard.data import load_summary, load_historic
+from src.actuarial.load_filter import age_value
 
 SEX_NAMES = {"T": "Total", "F": "Female", "M": "Male"}
 SEX_COLORS = {"Total": "#978722", "Female": "#b83030", "Male": "#357ed8"}

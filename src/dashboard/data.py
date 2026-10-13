@@ -16,10 +16,10 @@ import pandas as pd
 import streamlit as st
 
 from src.data.harmonization import add_harmonized_col
-from src.step2.life_table import add_life_tab_col
-from src.step2.load_filter import age_value, load_filter
+from src.actuarial.life_table import add_life_tab_col
+from src.actuarial.load_filter import age_value, load_filter
 
-PROCESSED = Path(__file__).resolve().parents[3] / "data" / "processed"
+PROCESSED = Path(__file__).resolve().parents[2] / "data" / "processed"
 MODEL = PROCESSED / "model"
 
 SEX_LABELS = {"T": "Total", "F": "Female", "M": "Male"}
@@ -211,7 +211,7 @@ def age_range_label(bands):
 
 @st.cache_data
 def load_model(name):
-    """One precomputed model table from data/processed/model/ (scripts/step3/forecast_precompute.py).
+    """One precomputed model table from data/processed/model/ (scripts/national/forecast_precompute.py).
 
     Every table is derived only (parameters, ex, improvement, A/E ratios), so it can go
     straight to a chart.
