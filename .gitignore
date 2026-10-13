@@ -16,6 +16,9 @@ Thumbs.db
 # Streamlit local secrets
 .streamlit/secrets.toml
 
+# Local notes for AI coding assistants (kept on the author's machine only)
+CLAUDE.md
+
 # CDC WONDER data is not redistributed: every CSV under data/ (raw exports, processed
 # tables, model outputs) and the Phase 1 prototype's local copies stay on your machine.
 # See data/README.md for how to recreate them.

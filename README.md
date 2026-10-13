@@ -98,7 +98,6 @@ as matplotlib windows, and writes no files.
 ├── docs/images/         figures used in this README
 ├── reports/             reserved for the actuarial memo (not written yet)
 ├── tests/               reserved for unit tests (not written yet)
-├── CLAUDE.md            guidance for AI coding assistants working in this repo
 └── requirements.txt
 ```
 
