@@ -1,5 +1,10 @@
 # US Mortality Modeling with CDC WONDER
 
+[![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://mortality-project-actuarial-vma3dnby3yfzskwfwpncby.streamlit.app/)
+
+**Live dashboard:** https://mortality-project-actuarial-vma3dnby3yfzskwfwpncby.streamlit.app/
+(hosted on Streamlit Community Cloud; if it has been idle, it takes about a minute to wake up)
+
 An actuarial data-science project on US death records from CDC WONDER (1968-2024). It builds
 life tables from raw exports, graduates them, decides which state and cause-of-death slices are
 statistically credible, fits Lee-Carter and Poisson Lee-Carter mortality models, backtests the
