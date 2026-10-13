@@ -4,7 +4,7 @@ Design: dashboard_strategy.primary.forecast_view_design in config.yaml.
 Tabs: Forecast, Backtest, Model & limitations ("a credible forecast, then the evidence it
 can be trusted").
 
-- Nothing is fitted live: scripts/national/forecast_precompute.py writes data/processed/model/.
+- Nothing is fitted live: scripts/national/forecast_precompute.py writes data/dashboard/model/.
 - Labeling rule: the life table stops at 84, so ex is "expected years lived from age x to 85",
   never "e65" or "life expectancy".
 - CDC WONDER display rule: parameters, ex, improvement rates and A/E ratios only.

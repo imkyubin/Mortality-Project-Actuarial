@@ -1,9 +1,11 @@
-"""Streamlit entry point.
+"""Streamlit entry point for the US Mortality Explorer dashboard (three pages in src/dashboard/).
 
-Run from the repo root: python -m streamlit run src/dashboard/streamlit_app.py
-(`python -m` puts the repo root on sys.path so `src` imports.)
+Run from the repo root: streamlit run streamlit_app.py
+Streamlit puts this file's folder (the repo root) on the import path, so `src` imports. This
+is also the entrypoint Streamlit Community Cloud uses for the hosted app.
 
-Page 3 reads data/processed/model/, written by: python -m scripts.national.forecast_precompute
+The pages read only data/dashboard/: derived tables committed to the repo, so the app runs
+from a fresh clone without the CDC WONDER data.
 """
 import streamlit as st
 

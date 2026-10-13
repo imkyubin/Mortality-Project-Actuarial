@@ -1,16 +1,24 @@
 # Data
 
-No data is committed. CDC WONDER data stays on your machine (every `*.csv` under `data/` is
-gitignored), so after cloning you need to download the exports below and run the pipeline to
-rebuild everything else.
+The CDC WONDER data itself is not committed: `raw/` and `processed/` stay on your machine (every
+`*.csv` under `data/` is gitignored except `dashboard/`). To rebuild from scratch you download the
+exports below and run the pipeline. You don't need to just to use the dashboard: it reads only
+`dashboard/`, which is committed.
 
 ```
 data/
-├── raw/             national CDC WONDER exports, exactly as downloaded
-├── processed/       cleaned tables, the state x cause exports, credibility-validation outputs
-│   └── model/       precomputed Lee-Carter results read by the dashboard's forecast page
+├── raw/             national CDC WONDER exports, exactly as downloaded            (local only)
+├── processed/       cleaned tables, the state x cause exports, credibility outputs (local only)
+├── dashboard/       derived tables the dashboard reads: no Deaths or Population   (committed)
+│   └── model/       precomputed Lee-Carter results for the forecast page
 └── outputs/         reserved for report tables and figures (not used yet)
 ```
+
+`dashboard/` holds rates per 100,000, life-table values (lx, px, ex), the credibility report,
+US 2000 standard-population shares, model parameters and forecasts, and A/E ratios. The one
+non-obvious column is `Exposure Weight` in `rates.csv`: each cell's population divided by its
+own 1999-2024 average. It lets the app pool any year window exactly,
+sum(weight × rate) / sum(weight) = sum(deaths) / sum(population), without publishing either count.
 
 ## 1. National exports → `data/raw/`
 
@@ -50,21 +58,22 @@ disease, Influenza and pneumonia, Chronic liver disease and cirrhosis.
 Run from the repo root, in this order (the main [README](../README.md#run-the-pipeline) has the
 same commands):
 
-| Script | Reads | Writes to `data/processed/` |
+| Script | Reads | Writes |
 |---|---|---|
-| `scripts/national/clean_wonder_exports.py` | the 4 national exports | `old_1968_1998.csv`, `new_1999_2024.csv` |
-| `scripts/national/harmonize_age_groups.py` | both files above | `harmonized_1968-2024.csv` (dashboard page 1) |
-| `scripts/national/forecast_precompute.py` | `new_1999_2024.csv` | `model/*.csv` (dashboard page 3) |
-| `scripts/sublevel/combine_exports.py` | the 11 state x cause exports | `final.csv` |
-| `scripts/sublevel/validate_credibility.py` | `final.csv` | `single_age_final.csv`, `grouped_age_final.csv`, `validation_report.csv` (dashboard page 2), audit tables `audit_single_age.csv`, `audit_grouped_age.csv`, `dim_flags.csv` |
+| `scripts/national/clean_wonder_exports.py` | the 4 national exports | `processed/old_1968_1998.csv`, `processed/new_1999_2024.csv` |
+| `scripts/national/harmonize_age_groups.py` | both files above | `processed/harmonized_1968-2024.csv` |
+| `scripts/national/forecast_precompute.py` | `processed/new_1999_2024.csv` | `dashboard/model/*.csv` (page 3) |
+| `scripts/sublevel/combine_exports.py` | the 11 state x cause exports | `processed/final.csv` |
+| `scripts/sublevel/validate_credibility.py` | `processed/final.csv` | `processed/`: `single_age_final.csv`, `grouped_age_final.csv`, `validation_report.csv`, audit tables `audit_single_age.csv`, `audit_grouped_age.csv`, `dim_flags.csv` |
+| `scripts/export_dashboard_data.py` | `processed/harmonized_1968-2024.csv`, the two `*_final.csv`, `validation_report.csv` | `dashboard/`: `historic.csv` (page 1), `rates.csv`, `standard_weights.csv`, `validation_report.csv` (page 2) |
 
 ## Data use
 
 CDC WONDER data is provided under its data use restrictions, which among other things bar
 publishing counts of 9 or fewer (or rates based on them). This project goes further: the
-data is never redistributed, and the dashboard shows no `Deaths` or `Population` values at all,
-only derived rates, life-table values and ratios from cells that pass the credibility check
-(at least 1,082 deaths in every year). The audit tables hold per-cell minimum death counts, some
+raw data is never redistributed, and neither the dashboard nor `dashboard/` contains any `Deaths`
+or `Population` values, only derived rates, life-table values and ratios from cells that pass the
+credibility check (at least 1,082 deaths in every year). The audit tables hold per-cell minimum death counts, some
 under 10, and stay offline.
 
 Source: Centers for Disease Control and Prevention, National Center for Health Statistics.

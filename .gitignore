@@ -20,7 +20,12 @@ Thumbs.db
 CLAUDE.md
 
 # CDC WONDER data is not redistributed: every CSV under data/ (raw exports, processed
-# tables, model outputs) and the Phase 1 prototype's local copies stay on your machine.
+# tables) and the Phase 1 prototype's local copies stay on your machine.
 # See data/README.md for how to recreate them.
 data/**/*.csv
 archive/phase1_excel/data/
+
+# ...except data/dashboard/: derived tables only (rates, life-table values, ratios, model
+# outputs; no Deaths or Population), committed so the dashboard runs from a fresh clone.
+!data/dashboard/*.csv
+!data/dashboard/model/*.csv

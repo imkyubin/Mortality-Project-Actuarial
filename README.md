@@ -37,7 +37,8 @@ forecast out of sample, and presents the results in a three-page Streamlit dashb
 | **3. Mortality forecast** | National, all causes, single ages 20-84 | Lee-Carter forecast to 2050 with a 95% band, pre-COVID vs full calibration, the 1999-2014 backtest, model parameters, A/E heatmap and stated limitations |
 
 Every chart responds to its page's controls (years, sex, model, calibration window). The dashboard never
-displays raw death or population counts, only derived rates, life-table values and ratios.
+displays raw death or population counts, only derived rates, life-table values and ratios, and the
+repository publishes only those derived tables (`data/dashboard/`); the CDC WONDER exports stay local.
 
 ![Which combinations passed the credibility check](docs/images/credibility_coverage.png)
 
@@ -45,33 +46,37 @@ displays raw death or population counts, only derived rates, life-table values a
 
 ## Run it
 
-Tested with Python 3.14 and the exact package versions pinned in `requirements.txt`.
+The dashboard runs straight from a clone: it reads only the derived tables in `data/dashboard/`
+(rates, life-table values, ratios and model outputs, with no death or population counts), which
+are committed. Tested with Python 3.14 and the exact package versions in `requirements.txt`.
 
 ```bash
+git clone https://github.com/imkyubin/Mortality-Project-Actuarial.git
+cd Mortality-Project-Actuarial
 python -m venv .venv
 source .venv/bin/activate          # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
+streamlit run streamlit_app.py
 ```
 
-The data is not in the repository (CDC WONDER terms). Download the exports listed in
-[data/README.md](data/README.md), then build every table the dashboard reads.
+### Rebuild from the raw data
 
-### Run the pipeline
-
-Run these from the repo root. `python -m` puts the root on the import path, so `src` resolves.
+To recompute everything from CDC WONDER, download the exports listed in
+[data/README.md](data/README.md) (they are not redistributed here), then run from the repo root.
+`python -m` puts the root on the import path, so `src` resolves.
 
 ```bash
 # National pipeline
 python -m scripts.national.clean_wonder_exports     # raw exports -> old_1968_1998.csv, new_1999_2024.csv
-python -m scripts.national.harmonize_age_groups     # -> harmonized_1968-2024.csv (page 1)
-python -m scripts.national.forecast_precompute      # fits both models, forecasts, backtest -> model/*.csv (page 3)
+python -m scripts.national.harmonize_age_groups     # -> harmonized_1968-2024.csv
+python -m scripts.national.forecast_precompute      # both models, forecasts, backtest -> data/dashboard/model/ (page 3)
 
 # State x cause pipeline
 python -m scripts.sublevel.combine_exports          # 11 exports -> final.csv
-python -m scripts.sublevel.validate_credibility     # -> validation_report.csv and model-ready tables (page 2)
+python -m scripts.sublevel.validate_credibility     # -> validation_report.csv and model-ready tables
 
-# Dashboard
-python -m streamlit run src/dashboard/streamlit_app.py
+# Publish the derived tables pages 1-2 read (refuses to write any count column)
+python -m scripts.export_dashboard_data             # -> data/dashboard/*.csv
 ```
 
 `python -m scripts.national.model_diagnostics` is optional. It is the analyst's view of the same
@@ -81,6 +86,7 @@ as matplotlib windows, and writes no files.
 ## Repository layout
 
 ```
+├── streamlit_app.py     dashboard entry point (streamlit run streamlit_app.py)
 ├── src/
 │   ├── data/            load CDC WONDER exports, clean them, map single ages to age groups
 │   ├── actuarial/       life tables, Whittaker-Henderson graduation, Lee-Carter (SVD and Poisson),
@@ -91,8 +97,11 @@ as matplotlib windows, and writes no files.
 │   └── visualization/   planned Power BI / Tableau exports (placeholder)
 ├── scripts/
 │   ├── national/        clean → harmonize → diagnostics → forecast precompute
-│   └── sublevel/        combine state × cause exports → credibility validation
-├── data/                local only; see data/README.md for how to recreate it
+│   ├── sublevel/        combine state × cause exports → credibility validation
+│   └── export_dashboard_data.py   publish the derived tables the dashboard reads
+├── data/
+│   ├── dashboard/       derived tables the app reads (committed; no counts)
+│   └── raw/, processed/ CDC WONDER exports and working tables (local only; see data/README.md)
 ├── config/config.yaml   project decision log: scope, every design decision with its rationale, status
 ├── archive/             Excel prototype and superseded scripts (see archive/README.md)
 ├── docs/images/         figures used in this README

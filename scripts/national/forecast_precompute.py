@@ -4,11 +4,12 @@ Run from the repo root: python -m scripts.national.forecast_precompute
 
 Fits both models (Poisson Lee-Carter primary, SVD for comparison) on both calibration
 windows (1999-2024 and pre-COVID 1999-2019), forecasts to LAST_FORECAST_YEAR, runs the
-1999-2014 / 2015-2024 backtest, and writes small CSVs to data/processed/model/. The page
+1999-2014 / 2015-2024 backtest, and writes small CSVs to data/dashboard/model/. The page
 only reads these files; nothing is fitted live (the Poisson fit is iterative).
 
 CDC WONDER display rule: every file holds derived values only (parameters, ex, improvement
-rates, A/E ratios, variance explained), never Deaths or Population.
+rates, A/E ratios, variance explained), never Deaths or Population, so data/dashboard/ can be
+committed and the app deployed without the counts.
 Design: dashboard_strategy.primary.forecast_view_design in config.yaml.
 """
 from pathlib import Path
@@ -25,7 +26,7 @@ from src.actuarial.forecasting import calculate_kt_changes, estimate_drift, fore
 from src.actuarial.backtest import backtest, mean_abs_pct_error
 
 PROCESSED = Path("data/processed")
-OUT = PROCESSED / "model"
+OUT = Path("data/dashboard/model")
 
 MODELS = {"Poisson": fit_poisson_lc_all, "SVD": fit_lc_all}
 CALIBRATIONS = {"1999-2024": 2024, "1999-2019": 2019}

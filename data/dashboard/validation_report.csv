@@ -1,0 +1,136 @@
+Sex Code,State,Cause List,Age Floor,Resolution,Min Age Kept,Max Age Kept,Groups Kept,Drop Reason,Variance Explained,Benchmark,Variance Pass
+F,California,#Alzheimer disease (G30),70,dropped,,,,75-84 failed: no credible age range,,,
+M,California,#Alzheimer disease (G30),70,dropped,,,,75-84 failed: no credible age range,,,
+T,California,#Alzheimer disease (G30),70,dropped,,,,fewer than 3 age groups after truncation,,,
+F,California,#Cerebrovascular diseases (I60-I69),55,dropped,,,,fewer than 3 age groups after truncation,,,
+M,California,#Cerebrovascular diseases (I60-I69),55,dropped,,,,fewer than 3 age groups after truncation,,,
+T,California,#Cerebrovascular diseases (I60-I69),55,dropped,,,,fewer than 3 age groups after truncation,,,
+F,California,"#Chronic liver disease and cirrhosis (K70,K73-K74)",35,dropped,,,,75-84 failed: no credible age range,,,
+M,California,"#Chronic liver disease and cirrhosis (K70,K73-K74)",35,dropped,,,,75-84 failed: no credible age range,,,
+T,California,"#Chronic liver disease and cirrhosis (K70,K73-K74)",35,dropped,,,,75-84 failed: no credible age range,,,
+F,California,#Chronic lower respiratory diseases (J40-J47),55,dropped,,,,fewer than 3 age groups after truncation,,,
+M,California,#Chronic lower respiratory diseases (J40-J47),55,dropped,,,,fewer than 3 age groups after truncation,,,
+T,California,#Chronic lower respiratory diseases (J40-J47),55,dropped,,,,fewer than 3 age groups after truncation,,,
+F,California,#Diabetes mellitus (E10-E14),55,dropped,,,,75-84 failed: no credible age range,,,
+M,California,#Diabetes mellitus (E10-E14),55,dropped,,,,75-84 failed: no credible age range,,,
+T,California,#Diabetes mellitus (E10-E14),55,dropped,,,,fewer than 3 age groups after truncation,,,
+F,California,"#Diseases of heart (I00-I09,I11,I13,I20-I51)",45,grouped,55.0,84.0,3.0,,0.9768880081149968,0.5757386622725712,True
+M,California,"#Diseases of heart (I00-I09,I11,I13,I20-I51)",45,grouped,45.0,84.0,4.0,,0.966186285210814,0.5814758815292557,True
+T,California,"#Diseases of heart (I00-I09,I11,I13,I20-I51)",45,grouped,45.0,84.0,4.0,,0.969552712736148,0.6054146574827818,True
+F,California,#Influenza and pneumonia (J09-J18),55,dropped,,,,75-84 failed: no credible age range,,,
+M,California,#Influenza and pneumonia (J09-J18),55,dropped,,,,75-84 failed: no credible age range,,,
+T,California,#Influenza and pneumonia (J09-J18),55,dropped,,,,fewer than 3 age groups after truncation,,,
+F,California,#Malignant neoplasms (C00-C97),45,grouped,45.0,84.0,4.0,,0.9837521497464204,0.5757386622725712,True
+M,California,#Malignant neoplasms (C00-C97),45,grouped,45.0,84.0,4.0,,0.9842780666680496,0.5814758815292557,True
+T,California,#Malignant neoplasms (C00-C97),45,grouped,45.0,84.0,4.0,,0.9888825802335316,0.6054146574827818,True
+F,California,All,20,grouped,25.0,84.0,6.0,,0.6271413530613676,0.5757386622725712,True
+M,California,All,20,grouped,20.0,84.0,7.0,,0.6325320870063658,0.5814758815292557,True
+T,California,All,20,grouped,20.0,84.0,7.0,,0.5999353638554548,0.6054146574827818,True
+F,Florida,#Alzheimer disease (G30),70,dropped,,,,75-84 failed: no credible age range,,,
+M,Florida,#Alzheimer disease (G30),70,dropped,,,,75-84 failed: no credible age range,,,
+T,Florida,#Alzheimer disease (G30),70,dropped,,,,fewer than 3 age groups after truncation,,,
+F,Florida,#Cerebrovascular diseases (I60-I69),55,dropped,,,,fewer than 3 age groups after truncation,,,
+M,Florida,#Cerebrovascular diseases (I60-I69),55,dropped,,,,fewer than 3 age groups after truncation,,,
+T,Florida,#Cerebrovascular diseases (I60-I69),55,dropped,,,,fewer than 3 age groups after truncation,,,
+F,Florida,"#Chronic liver disease and cirrhosis (K70,K73-K74)",35,dropped,,,,75-84 failed: no credible age range,,,
+M,Florida,"#Chronic liver disease and cirrhosis (K70,K73-K74)",35,dropped,,,,75-84 failed: no credible age range,,,
+T,Florida,"#Chronic liver disease and cirrhosis (K70,K73-K74)",35,dropped,,,,75-84 failed: no credible age range,,,
+F,Florida,#Chronic lower respiratory diseases (J40-J47),55,dropped,,,,fewer than 3 age groups after truncation,,,
+M,Florida,#Chronic lower respiratory diseases (J40-J47),55,dropped,,,,fewer than 3 age groups after truncation,,,
+T,Florida,#Chronic lower respiratory diseases (J40-J47),55,dropped,,,,fewer than 3 age groups after truncation,,,
+F,Florida,#Diabetes mellitus (E10-E14),55,dropped,,,,75-84 failed: no credible age range,,,
+M,Florida,#Diabetes mellitus (E10-E14),55,dropped,,,,75-84 failed: no credible age range,,,
+T,Florida,#Diabetes mellitus (E10-E14),55,dropped,,,,fewer than 3 age groups after truncation,,,
+F,Florida,"#Diseases of heart (I00-I09,I11,I13,I20-I51)",45,grouped,55.0,84.0,3.0,,0.9486708742638336,0.5757386622725712,True
+M,Florida,"#Diseases of heart (I00-I09,I11,I13,I20-I51)",45,grouped,45.0,84.0,4.0,,0.9428712962435586,0.5814758815292557,True
+T,Florida,"#Diseases of heart (I00-I09,I11,I13,I20-I51)",45,grouped,45.0,84.0,4.0,,0.946199461954825,0.6054146574827818,True
+F,Florida,#Influenza and pneumonia (J09-J18),55,dropped,,,,75-84 failed: no credible age range,,,
+M,Florida,#Influenza and pneumonia (J09-J18),55,dropped,,,,75-84 failed: no credible age range,,,
+T,Florida,#Influenza and pneumonia (J09-J18),55,dropped,,,,75-84 failed: no credible age range,,,
+F,Florida,#Malignant neoplasms (C00-C97),45,grouped,45.0,84.0,4.0,,0.9542743920096796,0.5757386622725712,True
+M,Florida,#Malignant neoplasms (C00-C97),45,grouped,55.0,84.0,3.0,,0.9622960360965984,0.5814758815292557,True
+T,Florida,#Malignant neoplasms (C00-C97),45,grouped,45.0,84.0,4.0,,0.9718857231383758,0.6054146574827818,True
+F,Florida,All,20,grouped,35.0,84.0,5.0,,0.7175712931578683,0.5757386622725712,True
+M,Florida,All,20,grouped,25.0,84.0,6.0,,0.6192869384492349,0.5814758815292557,True
+T,Florida,All,20,grouped,25.0,84.0,6.0,,0.6330380802469563,0.6054146574827818,True
+F,New York,#Alzheimer disease (G30),70,dropped,,,,75-84 failed: no credible age range,,,
+M,New York,#Alzheimer disease (G30),70,dropped,,,,75-84 failed: no credible age range,,,
+T,New York,#Alzheimer disease (G30),70,dropped,,,,75-84 failed: no credible age range,,,
+F,New York,#Cerebrovascular diseases (I60-I69),55,dropped,,,,75-84 failed: no credible age range,,,
+M,New York,#Cerebrovascular diseases (I60-I69),55,dropped,,,,75-84 failed: no credible age range,,,
+T,New York,#Cerebrovascular diseases (I60-I69),55,dropped,,,,fewer than 3 age groups after truncation,,,
+F,New York,"#Chronic liver disease and cirrhosis (K70,K73-K74)",35,dropped,,,,75-84 failed: no credible age range,,,
+M,New York,"#Chronic liver disease and cirrhosis (K70,K73-K74)",35,dropped,,,,75-84 failed: no credible age range,,,
+T,New York,"#Chronic liver disease and cirrhosis (K70,K73-K74)",35,dropped,,,,75-84 failed: no credible age range,,,
+F,New York,#Chronic lower respiratory diseases (J40-J47),55,dropped,,,,75-84 failed: no credible age range,,,
+M,New York,#Chronic lower respiratory diseases (J40-J47),55,dropped,,,,75-84 failed: no credible age range,,,
+T,New York,#Chronic lower respiratory diseases (J40-J47),55,dropped,,,,fewer than 3 age groups after truncation,,,
+F,New York,#Diabetes mellitus (E10-E14),55,dropped,,,,75-84 failed: no credible age range,,,
+M,New York,#Diabetes mellitus (E10-E14),55,dropped,,,,75-84 failed: no credible age range,,,
+T,New York,#Diabetes mellitus (E10-E14),55,dropped,,,,75-84 failed: no credible age range,,,
+F,New York,"#Diseases of heart (I00-I09,I11,I13,I20-I51)",45,grouped,55.0,84.0,3.0,,0.9753527130986208,0.5757386622725712,True
+M,New York,"#Diseases of heart (I00-I09,I11,I13,I20-I51)",45,grouped,55.0,84.0,3.0,,0.9730608287931198,0.5814758815292557,True
+T,New York,"#Diseases of heart (I00-I09,I11,I13,I20-I51)",45,grouped,45.0,84.0,4.0,,0.96768257613399,0.6054146574827818,True
+F,New York,#Influenza and pneumonia (J09-J18),55,dropped,,,,75-84 failed: no credible age range,,,
+M,New York,#Influenza and pneumonia (J09-J18),55,dropped,,,,75-84 failed: no credible age range,,,
+T,New York,#Influenza and pneumonia (J09-J18),55,dropped,,,,75-84 failed: no credible age range,,,
+F,New York,#Malignant neoplasms (C00-C97),45,grouped,55.0,84.0,3.0,,0.9827168659389716,0.5757386622725712,True
+M,New York,#Malignant neoplasms (C00-C97),45,grouped,55.0,84.0,3.0,,0.9939582051892382,0.5814758815292557,True
+T,New York,#Malignant neoplasms (C00-C97),45,grouped,45.0,84.0,4.0,,0.9906934730387584,0.6054146574827818,True
+F,New York,All,20,grouped,35.0,84.0,5.0,,0.8623551690130885,0.5757386622725712,True
+M,New York,All,20,grouped,25.0,84.0,6.0,,0.6099849922700142,0.5814758815292557,True
+T,New York,All,20,grouped,25.0,84.0,6.0,,0.6163695586568427,0.6054146574827818,True
+F,Texas,#Alzheimer disease (G30),70,dropped,,,,75-84 failed: no credible age range,,,
+M,Texas,#Alzheimer disease (G30),70,dropped,,,,75-84 failed: no credible age range,,,
+T,Texas,#Alzheimer disease (G30),70,dropped,,,,75-84 failed: no credible age range,,,
+F,Texas,#Cerebrovascular diseases (I60-I69),55,dropped,,,,fewer than 3 age groups after truncation,,,
+M,Texas,#Cerebrovascular diseases (I60-I69),55,dropped,,,,fewer than 3 age groups after truncation,,,
+T,Texas,#Cerebrovascular diseases (I60-I69),55,dropped,,,,fewer than 3 age groups after truncation,,,
+F,Texas,"#Chronic liver disease and cirrhosis (K70,K73-K74)",35,dropped,,,,75-84 failed: no credible age range,,,
+M,Texas,"#Chronic liver disease and cirrhosis (K70,K73-K74)",35,dropped,,,,75-84 failed: no credible age range,,,
+T,Texas,"#Chronic liver disease and cirrhosis (K70,K73-K74)",35,dropped,,,,75-84 failed: no credible age range,,,
+F,Texas,#Chronic lower respiratory diseases (J40-J47),55,dropped,,,,fewer than 3 age groups after truncation,,,
+M,Texas,#Chronic lower respiratory diseases (J40-J47),55,dropped,,,,fewer than 3 age groups after truncation,,,
+T,Texas,#Chronic lower respiratory diseases (J40-J47),55,dropped,,,,fewer than 3 age groups after truncation,,,
+F,Texas,#Diabetes mellitus (E10-E14),55,dropped,,,,75-84 failed: no credible age range,,,
+M,Texas,#Diabetes mellitus (E10-E14),55,dropped,,,,75-84 failed: no credible age range,,,
+T,Texas,#Diabetes mellitus (E10-E14),55,dropped,,,,fewer than 3 age groups after truncation,,,
+F,Texas,"#Diseases of heart (I00-I09,I11,I13,I20-I51)",45,grouped,55.0,84.0,3.0,,0.9658041579095302,0.5757386622725712,True
+M,Texas,"#Diseases of heart (I00-I09,I11,I13,I20-I51)",45,grouped,45.0,84.0,4.0,,0.9591610088977812,0.5814758815292557,True
+T,Texas,"#Diseases of heart (I00-I09,I11,I13,I20-I51)",45,grouped,45.0,84.0,4.0,,0.9587851857071364,0.6054146574827818,True
+F,Texas,#Influenza and pneumonia (J09-J18),55,dropped,,,,75-84 failed: no credible age range,,,
+M,Texas,#Influenza and pneumonia (J09-J18),55,dropped,,,,75-84 failed: no credible age range,,,
+T,Texas,#Influenza and pneumonia (J09-J18),55,dropped,,,,75-84 failed: no credible age range,,,
+F,Texas,#Malignant neoplasms (C00-C97),45,grouped,45.0,84.0,4.0,,0.9621234111954544,0.5757386622725712,True
+M,Texas,#Malignant neoplasms (C00-C97),45,grouped,45.0,84.0,4.0,,0.9690343524658892,0.5814758815292557,True
+T,Texas,#Malignant neoplasms (C00-C97),45,grouped,45.0,84.0,4.0,,0.9782823974769762,0.6054146574827818,True
+F,Texas,All,20,grouped,35.0,84.0,5.0,,0.7855262194494065,0.5757386622725712,True
+M,Texas,All,20,grouped,25.0,84.0,6.0,,0.6853397144816207,0.5814758815292557,True
+T,Texas,All,20,grouped,20.0,84.0,7.0,,0.7046706705504753,0.6054146574827818,True
+F,United States,#Alzheimer disease (G30),70,dropped,,,,fewer than 3 age groups after truncation,,,
+M,United States,#Alzheimer disease (G30),70,dropped,,,,fewer than 3 age groups after truncation,,,
+T,United States,#Alzheimer disease (G30),70,dropped,,,,fewer than 3 age groups after truncation,,,
+F,United States,#Cerebrovascular diseases (I60-I69),55,grouped,55.0,84.0,3.0,,0.973080512881779,0.5757386622725712,True
+M,United States,#Cerebrovascular diseases (I60-I69),55,grouped,55.0,84.0,3.0,,0.9583821142640764,0.5814758815292557,True
+T,United States,#Cerebrovascular diseases (I60-I69),55,grouped,55.0,84.0,3.0,,0.9646998215271674,0.6054146574827818,True
+F,United States,"#Chronic liver disease and cirrhosis (K70,K73-K74)",35,grouped,45.0,84.0,4.0,,0.8830540748427371,0.5757386622725712,True
+M,United States,"#Chronic liver disease and cirrhosis (K70,K73-K74)",35,grouped,35.0,84.0,5.0,,0.8322813313967405,0.5814758815292557,True
+T,United States,"#Chronic liver disease and cirrhosis (K70,K73-K74)",35,grouped,35.0,84.0,5.0,,0.8774190848416864,0.6054146574827818,True
+F,United States,#Chronic lower respiratory diseases (J40-J47),55,grouped,55.0,84.0,3.0,,0.8104328617308295,0.5757386622725712,True
+M,United States,#Chronic lower respiratory diseases (J40-J47),55,grouped,55.0,84.0,3.0,,0.9276702694250802,0.5814758815292557,True
+T,United States,#Chronic lower respiratory diseases (J40-J47),55,grouped,55.0,84.0,3.0,,0.8828704830355519,0.6054146574827818,True
+F,United States,#Diabetes mellitus (E10-E14),55,grouped,55.0,84.0,3.0,,0.9353391007302664,0.5757386622725712,True
+M,United States,#Diabetes mellitus (E10-E14),55,grouped,55.0,84.0,3.0,,0.7075311359998447,0.5814758815292557,True
+T,United States,#Diabetes mellitus (E10-E14),55,grouped,55.0,84.0,3.0,,0.8225571226095285,0.6054146574827818,True
+F,United States,"#Diseases of heart (I00-I09,I11,I13,I20-I51)",45,grouped,45.0,84.0,4.0,,0.9548994453779406,0.5757386622725712,True
+M,United States,"#Diseases of heart (I00-I09,I11,I13,I20-I51)",45,single,45.0,84.0,,,0.957053698974518,0.5814758815292557,True
+T,United States,"#Diseases of heart (I00-I09,I11,I13,I20-I51)",45,single,45.0,84.0,,,0.9610359537371704,0.6054146574827818,True
+F,United States,#Influenza and pneumonia (J09-J18),55,grouped,55.0,84.0,3.0,,0.8496994807358211,0.5757386622725712,True
+M,United States,#Influenza and pneumonia (J09-J18),55,grouped,55.0,84.0,3.0,,0.892052769664182,0.5814758815292557,True
+T,United States,#Influenza and pneumonia (J09-J18),55,grouped,55.0,84.0,3.0,,0.8754419203587145,0.6054146574827818,True
+F,United States,#Malignant neoplasms (C00-C97),45,grouped,45.0,84.0,4.0,,0.9773231824904944,0.5757386622725712,True
+M,United States,#Malignant neoplasms (C00-C97),45,grouped,45.0,84.0,4.0,,0.9834412197977406,0.5814758815292557,True
+T,United States,#Malignant neoplasms (C00-C97),45,single,45.0,84.0,,,0.9716216121604012,0.6054146574827818,True
+F,United States,All,20,grouped,20.0,84.0,7.0,,0.6095149826862561,0.5757386622725712,True
+M,United States,All,20,single,20.0,84.0,,,0.5814758815292557,0.5814758815292557,True
+T,United States,All,20,single,20.0,84.0,,,0.6054146574827818,0.6054146574827818,True

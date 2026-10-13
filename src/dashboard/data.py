@@ -3,24 +3,27 @@
 No layout code here, so the API and reporting layers can reuse the same lookup
 (api_layer.credibility_gate in config.yaml).
 
-CDC WONDER display rule: Deaths/Population are loaded only to derive rates. Every function
-that feeds a chart returns derived columns only, because Altair embeds the whole DataFrame
-it is given into the page (a count column would reach the browser even if no chart encodes it).
+Data source: data/dashboard/ only. Those tables are derived (rates, life-table values, ratios,
+shares) and committed to the repo, so the app runs from a fresh clone or a hosted deployment
+without any CDC WONDER counts. scripts/export_dashboard_data.py and
+scripts/national/forecast_precompute.py write them from the local pipeline outputs.
+
+CDC WONDER display rule: no Deaths or Population values reach a page. Every function that feeds
+a chart returns derived columns only, because Altair embeds the whole DataFrame it is given into
+the page.
 
 st.cache_data does not notice a regenerated CSV: clear the cache (C in the app, or
-`streamlit cache clear`) after re-running the pipeline or the forecast precompute.
+`streamlit cache clear`) after re-exporting data/dashboard/.
 """
 from pathlib import Path
 
 import pandas as pd
 import streamlit as st
 
-from src.data.harmonization import add_harmonized_col
-from src.actuarial.life_table import add_life_tab_col
-from src.actuarial.load_filter import age_value, load_filter
+from src.actuarial.load_filter import age_value
 
-PROCESSED = Path(__file__).resolve().parents[2] / "data" / "processed"
-MODEL = PROCESSED / "model"
+DASHBOARD_DATA = Path(__file__).resolve().parents[2] / "data" / "dashboard"
+MODEL = DASHBOARD_DATA / "model"
 
 SEX_LABELS = {"T": "Total", "F": "Female", "M": "Male"}
 
@@ -49,10 +52,8 @@ STANDARD_YEAR = 2000
 
 @st.cache_data
 def load_historic():
-    """National all-cause life table, 20-84 grouped ages, with a death rate per 100,000."""
-    df = load_filter(path=PROCESSED / "harmonized_1968-2024.csv", age_col="Age Group", age_values=age_value)
-    df = add_life_tab_col(df)
-    df["Deaths per 100k"] = df["Deaths"] / df["Population"] * 100000
+    """National all-cause life table, 20-84 grouped ages: death rate per 100,000, lx, px, ex."""
+    df = pd.read_csv(DASHBOARD_DATA / "historic.csv")
     df["Age Group"] = pd.Categorical(df["Age Group"], categories=age_value, ordered=True)
     return df
 
@@ -76,7 +77,7 @@ def load_summary():
 @st.cache_data
 def load_validation():
     """Table 3 of the sublevel validation audit trail: one row per (sex, state, cause)."""
-    return pd.read_csv(PROCESSED / "validation_report.csv")
+    return pd.read_csv(DASHBOARD_DATA / "validation_report.csv")
 
 
 def lookup_combination(state, sex_code, cause):
@@ -94,27 +95,16 @@ def passed_combinations(sex_code):
 
 
 @st.cache_data
-def load_grouped():
-    """Every passed combination on the shared 7-bin age axis (INTERNAL - keeps counts).
+def load_rates():
+    """Every passed combination on the shared 7-group age axis: rate per 100,000 and exposure weight.
 
-    Combinations that passed at single-year resolution are bucketed into the harmonized bins.
-    That is safe: a single-year combination passed at every age from its floor, and every
-    floor sits on a bin edge, so each bucketed bin holds its full set of ages. The two input
-    tables never share a combination, so the concat cannot double-count.
+    Combinations that passed at single-year resolution were bucketed into the groups when the
+    table was exported. Exposure Weight is each cell's population relative to its own 1999-2024
+    average, enough to pool a window exactly (see pooled_rates) without the counts.
     """
-    grouped_df = pd.read_csv(PROCESSED / "grouped_age_final.csv")
-    single_df = pd.read_csv(PROCESSED / "single_age_final.csv")
-    single_df = add_harmonized_col(single_df, "Single-Year Ages Code")
-    single_df = (
-        single_df
-        .groupby(["Year Code", "Age Group", "Sex Code", "State", "Cause List"], as_index=False)
-        [["Deaths", "Population"]]
-        .sum()
-    )
-    combined_df = pd.concat([grouped_df, single_df], ignore_index=True)
-    combined_df["Deaths per 100k"] = combined_df["Deaths"] / combined_df["Population"] * 100000
-    combined_df["Age Group"] = pd.Categorical(combined_df["Age Group"], categories=age_value, ordered=True)
-    return combined_df
+    df = pd.read_csv(DASHBOARD_DATA / "rates.csv")
+    df["Age Group"] = pd.Categorical(df["Age Group"], categories=age_value, ordered=True)
+    return df
 
 
 @st.cache_data
@@ -122,37 +112,37 @@ def standard_weights():
     """Direct-standardization weights: US, both sexes, all causes, year 2000, share by age group.
 
     Population is the same whatever the cause, so All causes is used because it keeps all 7
-    bins. Shares only (no counts) leave this function.
+    groups. Exported as shares, so no counts are involved.
     """
-    df = load_grouped()
-    pop = df[(df["State"] == BENCHMARK) & (df["Sex Code"] == "T") & (df["Cause List"] == "All")
-             & (df["Year Code"] == STANDARD_YEAR)].set_index("Age Group")["Population"]
-    return (pop / pop.sum()).rename("Weight")
+    df = pd.read_csv(DASHBOARD_DATA / "standard_weights.csv")
+    df["Age Group"] = pd.Categorical(df["Age Group"], categories=age_value, ordered=True)
+    return df.set_index("Age Group")["Weight"]
 
 
 def comparison_rates(sex_code, causes=None, states=None):
     """Death rate per 100,000 by year x age group for the requested combinations - derived only."""
-    df = load_grouped()
+    df = load_rates()
     df = df[df["Sex Code"] == sex_code]
     if causes is not None:
         df = df[df["Cause List"].isin(causes)]
     if states is not None:
         df = df[df["State"].isin(states)]
-    df = df.rename(columns={"Deaths per 100k": "Rate"})
     return df[["Year Code", "Age Group", "State", "Cause List", "Rate"]]
 
 
 def pooled_rates(sex_code, cause, start, end):
     """Rate per age group pooled over start-end (sum deaths / sum exposure) per location.
 
-    Pooling the window is steadier than a single year for the relative-mortality heatmap;
-    only the resulting rate leaves this function.
+    sum(D) / sum(P) equals sum(w * rate) / sum(w) for any weights w proportional to P within a
+    cell, so the exported Exposure Weight reproduces it exactly. Pooling the window is steadier
+    than a single year for the relative-mortality heatmap.
     """
-    df = load_grouped()
+    df = load_rates()
     df = df[(df["Sex Code"] == sex_code) & (df["Cause List"] == cause)
             & df["Year Code"].between(start, end)]
-    sums = df.groupby(["State", "Age Group"], observed=True)[["Deaths", "Population"]].sum()
-    return (sums["Deaths"] / sums["Population"] * 100000).rename("Rate").reset_index()
+    df = df.assign(Weighted=df["Rate"] * df["Exposure Weight"])
+    sums = df.groupby(["State", "Age Group"], observed=True)[["Weighted", "Exposure Weight"]].sum()
+    return (sums["Weighted"] / sums["Exposure Weight"]).rename("Rate").reset_index()
 
 
 def common_bands(rates, series_col):
@@ -211,7 +201,7 @@ def age_range_label(bands):
 
 @st.cache_data
 def load_model(name):
-    """One precomputed model table from data/processed/model/ (scripts/national/forecast_precompute.py).
+    """One precomputed model table from data/dashboard/model/ (scripts/national/forecast_precompute.py).
 
     Every table is derived only (parameters, ex, improvement, A/E ratios), so it can go
     straight to a chart.
