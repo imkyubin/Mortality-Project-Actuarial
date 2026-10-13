@@ -145,20 +145,21 @@ def build_forecast_life_table(ln_mx_projection, mx_column='forecast_mx'):
     return complete_forecast_lt
 
 def forecast_ex_fan(ln_mx_projection, age=65):
+    # age=None keeps every age (one fan per age), used by the backtest and the dashboard precompute.
     central_lt = build_forecast_life_table(ln_mx_projection, 'forecast_mx')
     kt_low_lt = build_forecast_life_table(ln_mx_projection, 'forecast_mx_kt_low')
     kt_high_lt = build_forecast_life_table(ln_mx_projection, 'forecast_mx_kt_high')
 
+    keys = ['Year Code', 'Sex Code', 'Single-Year Ages Code']
+
     def _ex_at_age(life_table, label):
-        return life_table.loc[
-            life_table['Single-Year Ages Code'] == age,
-            ['Year Code', 'Sex Code', 'ex']
-        ].rename(columns={'ex': label})
+        rows = life_table if age is None else life_table[life_table['Single-Year Ages Code'] == age]
+        return rows[keys + ['ex']].rename(columns={'ex': label})
 
     ex_fan_df = (
         _ex_at_age(central_lt, 'ex_forecast')
-        .merge(_ex_at_age(kt_low_lt, 'ex_kt_low'), on=['Year Code', 'Sex Code'])
-        .merge(_ex_at_age(kt_high_lt, 'ex_kt_high'), on=['Year Code', 'Sex Code'])
+        .merge(_ex_at_age(kt_low_lt, 'ex_kt_low'), on=keys)
+        .merge(_ex_at_age(kt_high_lt, 'ex_kt_high'), on=keys)
     )
 
     ex_fan_df['ex_lower'] = ex_fan_df[['ex_kt_low', 'ex_kt_high']].min(axis=1)

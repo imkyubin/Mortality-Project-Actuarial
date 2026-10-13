@@ -25,6 +25,9 @@ from the repo root so `src` resolves as a package:
 python -m scripts.data_cleaning_exploration
 python -m scripts.data_harmonization
 python scripts/step1_baseline_model_prototype.py
+python -m scripts.step3.sublevel_validation      # page 2 inputs (validation_report.csv, grouped/single finals)
+python -m scripts.step3.forecast_precompute      # page 3 inputs (data/processed/model/*.csv)
+python -m streamlit run src/step3/dashboard/streamlit_app.py
 ```
 
 Dependencies observed in use (not yet pinned anywhere): `pandas`, `numpy`, `matplotlib`, `statsmodels`, `scipy`.
@@ -216,39 +219,94 @@ are dashboard-facing versus internal-only.
 a validation reference for spot-checking Python outputs against known-correct formulas — not part of the active
 pipeline.
 
-## Streamlit dashboard — templates only; the user builds the real one
+## Streamlit dashboard (`src/step3/dashboard/`) — all three pages built
 
-**The user is writing the Streamlit dashboard themselves (decided 2026-09-24).** `templates/dashboard/` holds a
-working reference version Claude built first (both `dashboard_strategy` views), kept as a template to learn from,
-not as the implementation. Don't write or port the real dashboard code into `src/` unless asked — explain,
-review, or point at the template instead. Run the template with
-`python -m streamlit run templates/dashboard/streamlit_app.py` from the repo root (`python -m` puts the repo root on
-`sys.path` so `src` and `templates` import).
+**Status (2026-10-13):** all three `dashboard_strategy` pages are complete in `src/step3/dashboard/`. Page 1 is the
+user's own build; pages 2 and 3 were completed by Claude at the user's request (page 2 ported from the former
+`templates/dashboard/` reference, which was then deleted). Run from the repo root with
+`python -m streamlit run src/step3/dashboard/streamlit_app.py` (`python -m` puts the repo root on `sys.path` so
+`src` imports). Page 3 needs `python -m scripts.step3.forecast_precompute` run first.
 
-Template layout: `streamlit_app.py` (`st.navigation` entry point), `data.py` (`st.cache_data` loaders, `CAUSE_LABELS`,
-and `lookup_combination`, which reads `validation_report.csv` as the credibility lookup), `charts.py` (a single Altair
-`line_chart` helper with hover tooltips; colors are fixed per entity via `SEX_COLORS`/`AGE_BAND_COLORS`/`color_scale`,
-so filtering never repaints a series), `historic_view.py` (View 1: harmonized 1968-2024, national, 20-84, temporary
-life expectancy to 85 plus death rate by age band), and `subsection_view.py` (View 2: state × sex × cause from
-`single_age_final.csv`/`grouped_age_final.csv`, with the age axis chosen by the combination's `Resolution`; a
-dropped combination shows its `Drop Reason` in place of a chart, and a young-end truncation is disclosed).
+**The user keeps learning Streamlit in a separate, standalone folder:** `../Mortality Dashboard Practice/` (next to
+this repo on the Desktop, not a git repo). It has its own copies of the data, the pipeline helpers
+(`helpers/`), the model CSVs, the user's page 1, their page 2 progress (steps 0-1), a page 3 skeleton, an
+`answer_key/` copy of the finished dashboard, and the page 2 and page 3 learning-plan checklists in its
+`README.md`, plus its own `CLAUDE.md` with the teaching and silent-progress-tracking rules. Learning work happens
+there; this repo's dashboard is the finished product. If the data or model outputs here are regenerated, the
+practice folder's `data/` copies do not update on their own.
 
-**CDC WONDER display rule (the user's call, applies to the real dashboard too):** never display raw counts. No
-`Deaths` or `Population` values appear anywhere in the dashboard: no tables or `st.dataframe`, no count tooltips,
-and no audit tables (`audit_single_age.csv`/`audit_grouped_age.csv` hold per-cell minimum death counts, some under
-10). Show only derived values (rates per 100,000, life-table `ex`, variance explained) from cells that passed the
-credibility gate. This is stricter than CDC WONDER's own data-use rule, which bars publishing counts of 9 or fewer
-and rates based on them. The audit tables stay offline as project deliverables, not dashboard content.
+Module layout: `streamlit_app.py` (`st.navigation` entry point over the three pages); `data.py` (`st.cache_data`
+loaders, label maps, the credibility lookup, and the shared rate math: `load_grouped` buckets single-age
+combinations into the 7 bins, `standard_weights` = US 2000 both-sex population shares, `common_bands`,
+`age_standardize` (direct method), `improvement_table`, `pooled_rates`; plus `load_model`/`model_slice` for page 3's
+precomputed tables; chart-facing functions return derived columns only, because Altair embeds the whole DataFrame in
+the page); `charts.py` (`window_lines` = faded full history + bright From-To window + shaded band + optional thick
+emphasized series, `improvement_bars` with optional `yOffset` grouping, `heatmap` with a diverging scale,
+`fan_chart` = actual line + dashed forecast + shaded 95% band with optional labeled shaded regions, `series_lines`;
+fixed per-entity colors for sex, age group, location, cause); `historic_view.py` (page 1, builds its own charts
+inline); `subsection_view.py` (page 2); `forecast_view.py` (page 3). Loaders are `@st.cache_data`; the cache does not
+notice a regenerated CSV, so clear it after re-running the pipeline or the precompute.
 
-**Historic page design (the user's real dashboard, `src/step3/dashboard/`, decided 2026-09-29)** — full detail in
+**CDC WONDER display rule (the user's call):** never display raw counts. No `Deaths` or `Population` values appear
+anywhere in the dashboard: no tables or `st.dataframe` of counts, no count tooltips, and no audit tables
+(`audit_single_age.csv`/`audit_grouped_age.csv` hold per-cell minimum death counts, some under 10). Show only
+derived values (rates per 100,000, life-table `ex`, ratios, improvement, variance explained) from cells that passed
+the credibility gate. This is stricter than CDC WONDER's own data-use rule, which bars publishing counts of 9 or
+fewer and rates based on them. The audit tables stay offline as project deliverables, not dashboard content.
+
+**Page 1, historic (built 2026-10-05, the user's code)** — full detail in
 `dashboard_strategy.primary.historic_view_design` in `config.yaml`. Interactivity rule: every element must respond
 to the page's controls (From/To year selectboxes, Total/Female/Male radio); full-history charts keep 1968-2024 for
 context but visibly mark the selection (shaded From-To band, selected sex at full opacity, others faded) rather
-than ignoring it. Page contents: a 3-box metric row (done); 2a chance of reaching 85 over time (built, band and
-emphasis pending); 2b death rate per 100,000 by age group, log scale, filtered to the selected sex, with the same
-band; 2c average annual mortality improvement by age group over the From-To window, `1 - (rate_To/rate_From) **
-(1/(To-From))`, which replaced the originally-optional survival curve because improvement rates are how actuaries
-discuss mortality trend. The reach-85 figure is a period measure, not a cohort projection, and should be labeled so.
+than ignoring it. Contents: a 3-box metric row; 2a chance of reaching 85 over time (band, emphasis, and a
+period-measure caption, since it is not a cohort projection); 2b death rate per 100,000 by age group, log scale,
+filtered to the selected sex, with the same band; 2c average annual mortality improvement by age group over the
+From-To window, `1 - (rate_To/rate_From) ** (1/(To-From))` (horizontal bars plus a zero rule), which replaced the
+originally-optional survival curve because improvement rates are how actuaries discuss mortality trend.
+
+**Page 2, state and cause comparison (built 2026-10-13)** — full detail in
+`dashboard_strategy.primary.subsection_view_design`. `validation_report.csv` shows a clean survival pattern (same
+for every sex): the four states pass only for All causes, Heart disease and Cancer; the United States passes for
+every cause except Alzheimer's; Alzheimer's is dropped everywhere. So menus offer only combinations that passed,
+built from `validation_report.csv` (never hard-coded), with a caption explaining the gaps and the `Drop Reason`
+message kept as a fallback. Three tabs sharing page 1's controls (sex radio, From/To 1999-2024): **Compare
+locations** (cause limited to All/Heart/Cancer; state pills with the US always kept as benchmark; metric row;
+age-standardized rate over time per location; a state÷US relative-mortality heatmap by age band, pooled over the
+window; improvement bars by location; a computed takeaway sentence), **Compare causes, US** (cause pills with All
+causes kept as reference; metric row; age-standardized rate per cause on a log scale; a cause × age band improvement
+heatmap; a takeaway), and **Data & methodology** (a location × cause coverage matrix colored single/grouped/dropped,
+the credibility procedure in brief, limitations, repo link). All comparisons use the 7 grouped bins so series share
+one age axis; age standardization covers only bands every shown series kept, since crude rates mislead across
+different age mixes (Florida is older). Takeaway sentences are plain computed Python, not the LLM layer. Check
+values (Total, 1999-2024, All causes): highest TX 774 (+2% vs US), lowest NY 619 (−19%), fastest NY 1.51%/yr.
+
+**Page 3, forecast (built 2026-10-13)** — full detail in `dashboard_strategy.primary.forecast_view_design`.
+Surfaces the step 2 Lee-Carter / Poisson Lee-Carter work. National, all-cause, single ages 20-84, by sex. Never fit
+live: `scripts/step3/forecast_precompute.py` (`run_precompute`, ~5 s) fits both models on both calibration windows
+(1999-2024 and pre-COVID 1999-2019), forecasts to 2050, runs the 1999-2014 / 2015-2024 backtest
+(`src/step2/backtest.py`), and writes derived-only CSVs to `data/processed/model/` (`params`, `kt`, `summary`,
+`forecast_ex`, `actual_ex`, `ae_in_sample`, `backtest_ex`, `backtest_ae`, `backtest_error`; the script asserts no
+count column is written). Controls: sex, model (Poisson primary, SVD for comparison), starting age, horizon
+(2030-2050), calibration window. Tabs: **Forecast** (metric row with 95% interval and implied improvement; fan
+chart with COVID shaded; a computed calibration note on drift/sigma; Lee-Carter implied improvement
+`1 - exp(bx * drift)` by single age next to the observed log-linear trend, with a 1%/yr reference line),
+**Backtest** (pre-COVID and full-holdout mean absolute % error of years lived to 85, peak A/E; backtest fan chart
+with training window and COVID shaded; A/E bars per holdout year growing from 1.0; computed takeaway), **Model &
+limitations** (Poisson vs SVD table: drift, sigma, in-sample A/E, mean cell deviation; computed notes on why Poisson
+is primary and on variance explained; expanders with ax/bx/kt charts and the in-sample A/E heatmap; limitations,
+including that the band covers only `kt` process error and is therefore too narrow). Labeling rule: the life table
+stops at 84, so `ex` is "expected years lived from age x to 85", never "e65" or "life expectancy". Check values
+(Total, Poisson, 1999-2024, age 65, 2035): 16.53 of 20 (15.49-17.36), +0.39 vs 2024 actual 16.14; backtest error
+0.76% pre-COVID, 2.45% full, peak A/E 1.35 in 2021 (pre-COVID A/E already 1.02-1.06: the 1999-2014 trend missed
+the 2010s improvement slowdown).
+
+**Finding surfaced on page 3: the SVD fit breaks on 1999-2024.** With 2020-2024 included, the unweighted SVD's
+first factor puts ~70% of its `bx` weight on ages 25-44 (Poisson: ~9%) and its `kt` spikes in 2021, so it tracks
+the young-adult overdose and COVID shocks rather than the secular decline. Its drift turns positive (+0.096/yr for
+Total) and its forecast sits on the 1999-2024 average level. On 1999-2019 the two models agree closely. This is not
+a bug: unweighted least squares on log rates lets small, noisy young-adult cells count as much as high-exposure old
+ages, while Poisson weights by deaths (and reproduces total deaths exactly, in-sample A/E = 1.0000). It is the
+concrete case for Poisson being primary. First-factor variance explained: ~0.61 on 1999-2024 vs ~0.70 on 1999-2019.
 
 ## Whittaker-Henderson module (step 2) — current state
 
@@ -370,8 +428,12 @@ Both are wired end-to-end for the SVD and Poisson `kt` fits in `scripts/step2_al
 Still outstanding:
 - **Cumulative A/E deviation over time** — same spirit as `wh_worst_cumdev`, checking whether the
   Poisson-calibrated model systematically over/under-predicts deaths moving away from the fit window.
-- **Out-of-sample backtest plot** — forecast vs. actual mx/ex for held-out years, required by
-  `quality_bar.out_of_sample_backtest` in `config.yaml`; call out COVID 2020-2021 explicitly as expected
-  divergence, not a bug.
+- ~~**Out-of-sample backtest plot**~~ — **done 2026-10-13.** `src/step2/backtest.py`: `backtest(life_table,
+  fit_fn, train_end)` fits either model on years <= `train_end`, forecasts every holdout year, and returns forecast
+  vs actual `ex` (with band and % error) per year × sex × age plus actual/expected deaths per holdout year;
+  `mean_abs_pct_error` summarizes a window. Run on 1999-2014 / 2015-2024 by `scripts/step3/forecast_precompute.py`
+  and plotted on dashboard page 3's Backtest tab with COVID 2020-2021 called out as expected divergence. To
+  support it, `forecast_ex_fan(..., age=None)` now returns the fan at every age (the default `age=65` is unchanged
+  apart from an extra `Single-Year Ages Code` column).
 - **Deviance-residual diagnostic** (heatmap or QQ-plot) — once fitting is Poisson-based, plain residuals
   are the wrong diagnostic; standardized deviance residuals validate the Poisson assumption itself.
