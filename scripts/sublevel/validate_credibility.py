@@ -1,3 +1,17 @@
+"""Decide, for every (sex, location, cause), which ages are credible enough to model and show.
+
+Run from the repo root, after combine_exports:
+    python -m scripts.sublevel.validate_credibility
+
+Applies the sublevel decision procedure to data/processed/final.csv: each cause's age floor,
+the 1,082-deaths-in-every-year credibility test at single-year ages, the fallback to the 7 age
+groups, young-end truncation, a gap check, a minimum of 3 groups, and a Lee-Carter variance
+check against the national benchmark. Writes to data/processed/: the model-ready tables
+single_age_final.csv and grouped_age_final.csv, the per-combination report
+validation_report.csv, the audit tables audit_single_age.csv and audit_grouped_age.csv, and
+dim_flags.csv.
+"""
+
 import warnings
 
 import numpy as np

@@ -1,4 +1,13 @@
-"""Scratch workflow for testing CDC WONDER loading and first cleaning steps."""
+"""Clean the raw national CDC WONDER exports into the two processed tables.
+
+Run from the repo root: python -m scripts.national.clean_wonder_exports
+
+Reads the four exports in data/raw/: Compressed Mortality 1968-1978 and 1979-1998 (age groups)
+and Underlying Cause of Death 1999-2020 and 2021-2024 (single-year ages; the second file is the
+"2018-2024, Single Race" dataset exported for 2021-2024). Keeps year, age, sex, deaths and
+population, drops subtotal rows, labels the blank-sex total rows "T", flags CDC "Suppressed"
+cells, prints shape checks, and writes data/processed/old_1968_1998.csv and new_1999_2024.csv.
+"""
 
 from src.data.cleaning import (
     combine_datasets,

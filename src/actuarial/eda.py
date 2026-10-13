@@ -1,3 +1,9 @@
+"""Exploratory plots of the observed (ungraduated) life table, for analysis rather than the dashboard.
+
+Each function accepts either the single-age table (Single-Year Ages Code) or the harmonized
+grouped table (Age Group) and detects which from its columns.
+"""
+
 import numpy as np
 import pandas as pd
 
@@ -6,6 +12,7 @@ from matplotlib.colors import Normalize
 from matplotlib.colors import TwoSlopeNorm
 
 def plot_crude_mortality_surface(df, sex_code):
+    """Year x age heatmap of ln(qx) for one sex."""
     filtered_df = df[df["Sex Code"]==sex_code].copy()
     filtered_df["ln_qx"] = np.log(filtered_df["qx"])
 
@@ -88,6 +95,10 @@ def plot_crude_mortality_surface(df, sex_code):
         plt.show()
 
 def plot_progression_eda(df, sex_code, column, start_year=None, gaps=1):
+    """One curve per year (every `gaps` years from `start_year`) of `column` against age, for one sex.
+
+    `column` is "ln_qx" (mortality curve) or "Cumulative Survival" (survival curve).
+    """
     if start_year is None:
         min_year = df['Year Code'].min()
     else:
@@ -129,6 +140,7 @@ def plot_progression_eda(df, sex_code, column, start_year=None, gaps=1):
     plt.show()
 
 def top_n_ex(df, sex_code, df_n=5):
+    """Rank ages by the slope of ex over time for one sex; returns (df_n most declining, df_n most improving)."""
     if 'Single-Year Ages Code' in df.columns:
         top_df = df[df['Sex Code'] == sex_code][['Single-Year Ages Code', 'Year Code', 'ex']].copy()
 
@@ -164,6 +176,7 @@ def top_n_ex(df, sex_code, df_n=5):
         return top_n_neg_df, top_n_pos_df
 
 def plot_top_ex(df, sex_code, plot_n=3):
+    """Plot ex over time for the plot_n most-declining and most-improving ages from top_n_ex."""
     top_n_neg_df, top_n_pos_df = top_n_ex(df, sex_code, plot_n)
 
     top_neg = 0
@@ -270,6 +283,7 @@ def plot_top_ex(df, sex_code, plot_n=3):
             plt.show()
 
 def pct_change_qx(df, sex_code):
+    """Year x age table of yearly mortality improvement, -(qx_t / qx_(t-1) - 1), for one sex."""
     filtered_df = df[df["Sex Code"]==sex_code].copy()
 
     if 'Single-Year Ages Code' in df.columns:
@@ -311,6 +325,7 @@ def pct_change_qx(df, sex_code):
         return improvement_pivot
 
 def plot_pct_heatmap(df, sex_code):
+    """Heatmap of pct_change_qx centered at zero (blue = mortality falling, red = rising)."""
     improvement_pivot = pct_change_qx(df, sex_code)
 
     if 'Single-Year Ages Code' in df.columns:

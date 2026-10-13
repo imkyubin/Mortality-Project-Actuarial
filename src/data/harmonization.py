@@ -1,3 +1,11 @@
+"""Put single-year ages onto the age groups of the 1968-1998 exports.
+
+The 1999-2024 exports give single-year ages; the 1968-1998 Compressed Mortality exports give
+age groups. map_single_age maps one age to its group, add_harmonized_col applies that to a
+column, and aggregate sums deaths and population to one row per (year, age group, sex) so the
+two eras can be stacked into one 1968-2024 table.
+"""
+
 import pandas as pd
 
 def show_age_groups(df, age_column):

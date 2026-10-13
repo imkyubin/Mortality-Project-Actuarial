@@ -1,9 +1,22 @@
+"""Lee-Carter mortality model fitted by singular value decomposition (SVD).
+
+ln m(x, t) = ax + bx * kt: ax is the average log death rate at age x, kt a single mortality
+index over time, and bx how strongly each age follows it. ax is the row mean of the
+ages x years log-rate matrix; bx and kt come from the first SVD component of what remains,
+scaled so sum(bx) = 1 (mean(kt) = 0 follows from the centering). This least-squares fit weights
+every age-year cell equally; poisson_lee_carter.py fits the same model to death counts instead.
+"""
+
 import numpy as np
 import pandas as pd
 
 from src.actuarial.lc_outputs import reconstruct_lc, build_lc_tables
 
 def lc_matrix(df, sex_code):
+    """Log death rates for one sex as an ages x years matrix; returns (matrix, ages, years).
+
+    Uses ln(qx), where qx = Deaths / Population for single ages (the central death rate).
+    """
     df_model = df[
         df["Sex Code"] == sex_code
     ].copy()
@@ -24,6 +37,7 @@ def lc_matrix(df, sex_code):
     return matrix, ages, years
 
 def fit_lee_carter(matrix):
+    """Fit ax, bx, kt to an ages x years log-rate matrix by SVD; returns (ax, bx, kt)."""
     ax = np.mean(matrix, axis=1)
     centered = matrix - ax[:, None]
 
@@ -38,6 +52,12 @@ def fit_lee_carter(matrix):
     return ax, bx, kt
 
 def fit_lc_all(df):
+    """Fit Lee-Carter separately for every Sex Code in a single-age life table.
+
+    Returns three long tables: age_all (age, ax, bx, Sex Code), year_all (year, kt, Sex Code) and
+    fitted_all (age, year, fitted_ln_mx, fitted_mx, Sex Code). fit_poisson_lc_all returns the same
+    shapes, so every downstream function accepts either fit.
+    """
     sex_codes = df["Sex Code"].unique()
 
     age_list, year_list, fitted_list = [], [], []
@@ -59,6 +79,11 @@ def fit_lc_all(df):
     return age_all, year_all, fitted_all
 
 def lc_variance_explained(matrix):
+    """Share of variance in the centered log-rate matrix captured by each SVD component.
+
+    Returns Component, Variance Explained (S**2 / sum(S**2)) and Cumulative Variance. The first
+    row tests the single-factor assumption: how much of the age-time pattern one kt explains.
+    """
     ax = np.mean(matrix, axis=1)
     centered = matrix - ax[:, None]
 

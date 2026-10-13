@@ -18,6 +18,7 @@ from src.actuarial.forecasting import (
 KEYS = ['Year Code', 'Sex Code', 'Single-Year Ages Code']
 
 def split_train_holdout(life_table, train_end):
+    """Split a life table at train_end into (years <= train_end, later years)."""
     train = life_table[life_table['Year Code'] <= train_end]
     holdout = life_table[life_table['Year Code'] > train_end]
 

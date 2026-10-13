@@ -1,3 +1,15 @@
+"""Combine the state and US cause-of-death exports into one table with a Total sex.
+
+Run from the repo root: python -m scripts.sublevel.combine_exports
+
+Reads eleven pre-cleaned CDC WONDER single-year-age exports from data/processed/: one per state
+(California, Florida, New York, Texas; 8 causes, 1999-2020), "State All Causes", "US 8 Causes"
+and "US All Causes" (1999-2020), and their "... 2" counterparts for 2021-2024. Stacks them, adds
+Sex Code "T" rows as Female + Male, and writes data/processed/final.csv, the input to
+validate_credibility.py. ("US All Causes.csv" also carries a text Sex column, which passes
+through to final.csv; nothing downstream reads it.)
+"""
+
 import pandas as pd
 
 ny_df = pd.read_csv("data/processed/New York.csv")

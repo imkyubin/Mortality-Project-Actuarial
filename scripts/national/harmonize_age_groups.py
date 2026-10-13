@@ -1,3 +1,13 @@
+"""Build the 1968-2024 national table on one set of age groups (the data behind dashboard page 1).
+
+Run from the repo root, after clean_wonder_exports:
+    python -m scripts.national.harmonize_age_groups
+
+Buckets the 1999-2024 single-year ages into the 1968-1998 age groups, sums them, and appends
+them to the older data, writing data/processed/harmonized_1968-2024.csv. Prints the age groups
+found in the older data as a check.
+"""
+
 from src.data.cleaning import combine_datasets
 
 from src.data.harmonization import (

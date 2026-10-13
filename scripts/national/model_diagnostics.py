@@ -1,3 +1,15 @@
+"""Exploratory national model run: EDA, Whittaker-Henderson graduation, and both Lee-Carter fits.
+
+Run from the repo root, after clean_wonder_exports and harmonize_age_groups:
+    python -m scripts.national.model_diagnostics
+
+National all-cause data, ages 20-84, every sex. Draws the EDA plots, graduates every year-sex
+slice, fits SVD and Poisson Lee-Carter with A/E checks, and forecasts kt and ex at 65 for
+FORECAST_YEARS. It opens one matplotlib window per chart and writes no files: it is the worked
+example of how the src/actuarial/ functions fit together. The dashboard's model outputs come
+from forecast_precompute.py instead.
+"""
+
 import numpy as np
 
 from src.actuarial.load_filter import load_filter

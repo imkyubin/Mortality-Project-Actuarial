@@ -5,4 +5,6 @@ Purpose:
     (cause of death, age range, sex, location, year) and retrieve the
     matching life table, model, and forecast outputs for dashboards and
     LLM-supported report generation.
+
+Status: planned, not implemented yet (this file is a placeholder). See api_layer in config/config.yaml.
 """

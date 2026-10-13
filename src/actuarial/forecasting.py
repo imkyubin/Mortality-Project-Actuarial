@@ -1,3 +1,12 @@
+"""Forecast Lee-Carter mortality and turn it into projected life tables.
+
+kt is projected as a random walk with drift: drift and sigma are the mean and standard
+deviation of the yearly change in kt, and h years ahead kt = last kt + h * drift with a 95%
+band of +/- 1.96 * sigma * sqrt(h). The band covers only this kt process error, not
+uncertainty in ax, bx or the drift itself. Projected rates exp(ax + bx * kt) then go through
+the life table to give ex and its band. Works on the output of either Lee-Carter fit.
+"""
+
 import numpy as np
 import pandas as pd
 
@@ -6,12 +15,14 @@ import matplotlib.pyplot as plt
 from src.actuarial.life_table import add_life_tab_col
 
 def calculate_kt_changes(year_all):
+    """Sort year_all by sex and year and add delta_kt, the year-on-year change in kt."""
     year_sorted = year_all.sort_values(['Sex Code', 'year']).copy()
     year_sorted['delta_kt'] = year_sorted.groupby('Sex Code')['kt'].diff()
 
     return year_sorted
 
 def estimate_drift(year_sorted):
+    """Per sex: drift (mean of delta_kt) and sigma (standard deviation of delta_kt)."""
     drift_list = []
 
     for sex_code, group in year_sorted.groupby('Sex Code'):
@@ -24,6 +35,10 @@ def estimate_drift(year_sorted):
     return drift_list_final
 
 def kt_in_sample_fit(year_sorted, drift_df):
+    """Draw the drift line through fitted kt from its first year, with residuals.
+
+    A check that a straight-line trend is reasonable before forecasting with it.
+    """
     fit_list = []
 
     for sex_code, group in year_sorted.groupby('Sex Code'):
@@ -43,6 +58,7 @@ def kt_in_sample_fit(year_sorted, drift_df):
     return fit_list_final
 
 def plot_kt_in_sample_fit(kt_fit_df):
+    """Plot fitted kt against its drift line, one figure per sex."""
     for sex_code, group in kt_fit_df.groupby('Sex Code'):
         plt.figure(figsize=(8, 6))
 
@@ -58,6 +74,10 @@ def plot_kt_in_sample_fit(kt_fit_df):
         plt.show()
 
 def forecast_kt(year_sorted, drift_df, forecast_years):
+    """Project kt `forecast_years` steps past the last fitted year, per sex, with a 95% band.
+
+    Returns year, kt_forecast, kt_lower, kt_upper and Sex Code.
+    """
     forecast_list = []
 
     for sex_code, group in year_sorted.groupby('Sex Code'):
@@ -85,6 +105,7 @@ def forecast_kt(year_sorted, drift_df, forecast_years):
     return forecast_list_final
 
 def plot_kt_forecast(year_sorted, kt_forecast_df):
+    """Plot historical kt followed by the forecast and its 95% band, one figure per sex."""
     columns = ['year', 'kt', 'kt_lower', 'kt_upper']
 
     for sex_code, hist_group in year_sorted.groupby('Sex Code'):
@@ -111,6 +132,11 @@ def plot_kt_forecast(year_sorted, kt_forecast_df):
         plt.show()
 
 def project_ln_mx(age_all, kt_forecast_df):
+    """Forecast rates ax + bx * kt for every age, forecast year and sex, at the central kt and both band edges.
+
+    Adds forecast_mx, forecast_mx_kt_low and forecast_mx_kt_high (with their logs). Where bx < 0
+    the low-kt edge gives higher mortality, so forecast_ex_fan sorts the edges out afterwards.
+    """
     projection_df = age_all.merge(kt_forecast_df, on='Sex Code', how='left')
 
     projection_df['forecast_ln_mx'] = (
@@ -131,6 +157,7 @@ def project_ln_mx(age_all, kt_forecast_df):
     return projection_df
 
 def build_forecast_life_table(ln_mx_projection, mx_column='forecast_mx'):
+    """Life table from one projected rate column (Population = 1, Deaths = rate, so qx equals the rate)."""
     forecast_lt = ln_mx_projection.rename(
         columns={'age': 'Single-Year Ages Code', 'year': 'Year Code'}
     ).copy()
@@ -146,6 +173,11 @@ def build_forecast_life_table(ln_mx_projection, mx_column='forecast_mx'):
 
 def forecast_ex_fan(ln_mx_projection, age=65):
     # age=None keeps every age (one fan per age), used by the backtest and the dashboard precompute.
+    """Projected ex at `age` (every age if None) with its 95% band, per forecast year and sex.
+
+    Builds life tables for the central and both band-edge scenarios and takes the elementwise min
+    and max of the two edges as ex_lower and ex_upper.
+    """
     central_lt = build_forecast_life_table(ln_mx_projection, 'forecast_mx')
     kt_low_lt = build_forecast_life_table(ln_mx_projection, 'forecast_mx_kt_low')
     kt_high_lt = build_forecast_life_table(ln_mx_projection, 'forecast_mx_kt_high')
@@ -170,6 +202,7 @@ def forecast_ex_fan(ln_mx_projection, age=65):
     return ex_fan_df_final
 
 def plot_ex_fan_chart(single_age_life_table, ex_fan_df, age=65):
+    """Plot actual ex at `age`, the central forecast and its shaded 95% band, one figure per sex."""
     for sex_code, group in ex_fan_df.groupby('Sex Code'):
         historical = single_age_life_table[
             (single_age_life_table['Sex Code'] == sex_code)

@@ -23,6 +23,7 @@ NEW_COLUMNS = [
 
 
 def remove_grand_totals(df, age_column):
+    """Drop CDC WONDER's subtotal rows, which have a blank age."""
     cleaned_df = df.copy()
 
     cleaned_df = cleaned_df[
@@ -34,6 +35,7 @@ def remove_grand_totals(df, age_column):
 
 
 def filter_by_sex(df, sex_column, sex):
+    """Rows for one sex: "M", "F", or "T" (CDC WONDER's blank-sex total rows)."""
     cleaned_df = df.copy()
 
     if sex =="M":
@@ -48,6 +50,7 @@ def filter_by_sex(df, sex_column, sex):
         ]
 
 def fill_na_T(df, sex_column):
+    """Label CDC WONDER's blank-sex total rows as Sex Code "T"."""
     cleaned_df = df.copy()
 
     cleaned_df.loc[
@@ -58,6 +61,7 @@ def fill_na_T(df, sex_column):
     return cleaned_df
 
 def select_columns(df, columns):
+    """Copy of `df` with only `columns`."""
     return df[columns].copy()
 
 def flag_suppressed(df, columns=("Deaths", "Population")):
@@ -74,4 +78,5 @@ def flag_suppressed(df, columns=("Deaths", "Population")):
     return flagged_df
 
 def combine_datasets(dfs):
+    """Stack DataFrames into one with a fresh index."""
     return pd.concat(dfs, ignore_index=True)

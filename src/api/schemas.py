@@ -4,4 +4,6 @@ Purpose:
     Define the selectable subsection filters (cause of death, age range,
     sex, location, year) and the shape of returned life table, model, and
     forecast results.
+
+Status: planned, not implemented yet (this file is a placeholder). See api_layer in config/config.yaml.
 """

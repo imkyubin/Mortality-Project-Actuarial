@@ -1,3 +1,9 @@
+"""Tables and diagnostics shared by both Lee-Carter fits (SVD and Poisson).
+
+Rebuilds the fitted surface, plots the parameters, checks actual against expected deaths (A/E),
+and compares fitted with actual ex. Plots use matplotlib and are for analysis, not the dashboard.
+"""
+
 import numpy as np
 import pandas as pd
 
@@ -7,11 +13,13 @@ from matplotlib.colors import TwoSlopeNorm
 from src.actuarial.life_table import add_life_tab_col
 
 def reconstruct_lc(ax, bx, kt):
+    """Fitted log rates ax + bx * kt as an ages x years matrix."""
     fitted_ln_mx = ax[:, None] + np.outer(bx, kt)
 
     return fitted_ln_mx
 
 def build_lc_tables(ax, bx, kt, fitted_ln_mx, ages, years, sex_code):
+    """Turn one sex's fitted arrays into long tables (age_df, year_df, fitted_df); fitted_mx = exp(fitted_ln_mx)."""
     age_df = pd.DataFrame({
         "age": ages,
         "ax": ax,
@@ -44,6 +52,7 @@ def build_lc_tables(ax, bx, kt, fitted_ln_mx, ages, years, sex_code):
     return age_df, year_df, fitted_df
 
 def plot_lc_parameters(age_all, year_all):
+    """Plot ax and bx against age and kt against year, one figure each, for every sex in age_all."""
     sex_codes = age_all["Sex Code"].unique()
 
     for sex_code in sex_codes:
@@ -102,6 +111,11 @@ def plot_lc_parameters(age_all, year_all):
         plt.show()
 
 def ae_metric(df, fitted_all):
+    """Join fitted rates onto observed data and add Expected Deaths, AE Ratio and AE Deviation.
+
+    Expected Deaths = Population * fitted_mx; AE Ratio = Deaths / Expected Deaths;
+    AE Deviation = Deaths - Expected Deaths.
+    """
     fitted_all_edited = fitted_all.rename(columns={'age': 'Single-Year Ages Code', 'year': 'Year Code'}).copy()
     df_copy = df.copy()
 
@@ -121,6 +135,7 @@ def ae_metric(df, fitted_all):
     return ae_df
 
 def ae_heatmap(ae_df):
+    """Heatmap of AE Ratio - 1 by age and year, one per sex (red where actual deaths exceed the fit)."""
     df_model = ae_df.copy()
     sex_codes = df_model["Sex Code"].unique()
 
@@ -168,6 +183,10 @@ def ae_heatmap(ae_df):
         plt.show()
 
 def ae_summary(ae_df):
+    """Print total actual / total expected deaths per year and sex.
+
+    Deaths are summed before dividing, so small cells don't dominate the ratio.
+    """
     ae_df_2 = ae_df.copy()
 
     summary_list = []
@@ -181,6 +200,10 @@ def ae_summary(ae_df):
     print(ae_summary_df)
 
 def ex_progression_plot(single_age_life_table, ae_df, age=65):
+    """Plot fitted ex against actual ex at `age` over time, one figure per sex.
+
+    The fitted life table is rebuilt from the model's expected deaths in `ae_df`.
+    """
     fitted_all_edited = (
         ae_df.drop(columns='Deaths')
         .rename(columns={'Expected Deaths': 'Deaths'})

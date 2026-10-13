@@ -1,3 +1,12 @@
+"""Whittaker-Henderson graduation of single-age log mortality, one year and sex at a time.
+
+Chooses the smoothed curve z that minimizes sum(w * (y - z)**2) + lambda * sum((second
+difference of z)**2), where y = ln(qx): closeness of fit traded against smoothness by lambda.
+Weights are equal (pop_weights="n") or each age's share of the population. Also includes a
+lambda elbow search across the whole dataset and helpers that rank and plot the worst-fitting
+year-sex slices.
+"""
+
 import numpy as np
 import pandas as pd
 
@@ -7,6 +16,7 @@ from scipy import sparse
 from scipy.sparse.linalg import spsolve
 
 def _second_difference_matrix(n):
+    """(n-2) x n sparse matrix whose rows take second differences: z[i] - 2*z[i+1] + z[i+2]."""
     D = sparse.diags(
         diagonals=[np.ones(n-2), -2*np.ones(n-2), np.ones(n-2)],
         offsets=[0, 1, 2],
@@ -16,6 +26,10 @@ def _second_difference_matrix(n):
     return D
 
 def fit_whittaker_henderson(df, year, sex_code, lambda_=1, pop_weights="n"):
+    """Graduate ln(qx) for one year and sex; adds ln_qx, ln_qx_fitted_wh and whittaker_residual.
+
+    pop_weights="n" weights every age equally; any other value weights by population share.
+    """
     new_df = df.copy()
 
     model_df = new_df[
@@ -54,6 +68,7 @@ def fit_whittaker_henderson(df, year, sex_code, lambda_=1, pop_weights="n"):
     return model_df
 
 def fit_wh_all(df, lambda_=1, pop_weights="n"):
+    """fit_whittaker_henderson for every (Year Code, Sex Code) pair, stacked into one table."""
     df_distinct = df[["Year Code", "Sex Code"]].drop_duplicates()
 
     results_list = []
@@ -67,6 +82,7 @@ def fit_wh_all(df, lambda_=1, pop_weights="n"):
     return combined_df
     
 def lambda_metrics(df, lambda_grid, pop_weights="n"):
+    """For each lambda: weighted RSS and total roughness (sum of squared second differences) over the whole dataset."""
     lambda_grid_sorted = sorted(lambda_grid)
 
     lambda_tuple = []
@@ -95,6 +111,7 @@ def lambda_metrics(df, lambda_grid, pop_weights="n"):
     return lambda_df
 
 def plot_lambda_elbow(lambda_df):
+    """Smoothness against RSS, each point labeled with its lambda, for picking lambda at the elbow."""
     plt.figure(figsize=(8,5))
 
     plt.plot(
@@ -114,6 +131,7 @@ def plot_lambda_elbow(lambda_df):
     plt.show()
 
 def wh_heatmap(df, sex_code):
+    """Year x age heatmap of graduation residuals for one sex, centered at zero."""
     group_df = df[df['Sex Code']==sex_code]
 
     pivot_df = group_df.pivot(
@@ -155,6 +173,7 @@ def wh_heatmap(df, sex_code):
     plt.show()
 
 def plot_whittaker_fit(whittaker_df, metric=None, position=None, year=None, sex=None):
+    """Observed vs graduated ln(qx) for one slice; the optional arguments only label the title of ranked plots."""
     if metric == None and position == None and year == None and sex == None:
         plt.figure(figsize=(8,5))
 
@@ -203,6 +222,7 @@ def plot_whittaker_fit(whittaker_df, metric=None, position=None, year=None, sex=
         plt.show()
 
 def wh_worst_fit(whittaker_df, n=10, pop_weights="n"):
+    """The n year-sex slices with the largest (weighted) residual sum of squares."""
     rss_list = []
 
     for (key1, key2), df in whittaker_df.groupby(["Year Code", "Sex Code"]):
@@ -220,6 +240,7 @@ def wh_worst_fit(whittaker_df, n=10, pop_weights="n"):
     return top_rss_df
 
 def wh_worst_cumdev(whittaker_df, n=10, pop_weights="n"):
+    """The n year-sex slices with the largest absolute cumulative residual: the most persistent one-sided bias."""
     cumdev_list = []
     
     for (key1, key2), df in whittaker_df.groupby(["Year Code", "Sex Code"]):
@@ -236,6 +257,7 @@ def wh_worst_cumdev(whittaker_df, n=10, pop_weights="n"):
     return top_cumdev_df
 
 def plot_3worst_fit(top_df, whittaker_df, top_k=3):
+    """Plot the top `top_k` slices of a wh_worst_fit or wh_worst_cumdev ranking."""
     top_n_df = top_df.iloc[0:top_k].copy()
     top_n_df["Rank"] = range(1, len(top_n_df) + 1)
 

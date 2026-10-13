@@ -1,3 +1,11 @@
+"""Load a processed CDC WONDER CSV into the shape the life-table code expects.
+
+Coerces Year Code, Deaths and Population to numbers, keeps the requested ages (a numeric
+single-year range, or a list of age-group labels, by default `age_value`: the 7 harmonized
+groups 20-24 ... 75-84), and sorts by year, sex, then age. That sort matters: add_life_tab_col
+builds lx and Tx from row order.
+"""
+
 import pandas as pd
 
 age_value = ['20-24 years', '25-34 years', '35-44 years', '45-54 years', '55-64 years',
@@ -10,6 +18,13 @@ def load_filter(
         max_age=None,
         age_values=age_value
     ):
+    """Read `path` and return a numeric, age-filtered table sorted by year, sex and age.
+
+    age_col: "Single-Year Ages Code" (single ages) or "Age Group" (grouped ages).
+    min_age, max_age: inclusive single-age range to keep; when given, they take precedence.
+    age_values: age-group labels to keep, in order. The column becomes an ordered Categorical so
+        sorting follows age rather than text.
+    """
     df = pd.read_csv(path)
     validation_df = df.copy()
 

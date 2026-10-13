@@ -1,6 +1,21 @@
+"""Life-table columns from deaths and population.
+
+Per (Year Code, Sex Code): qx -> px = 1 - qx -> lx (starting at RADIX) -> dx = qx * lx ->
+Lx = lx - 0.5 * dx -> Tx (reverse cumulative sum of Lx) -> ex = Tx / lx.
+Single-year ages use qx = Deaths / Population. Grouped ages (n = 5 years for 20-24, else 10)
+convert the central rate m to qx = n*m / (1 + 0.5*n*m) and use Lx = n * (lx - 0.5 * dx).
+The table stops at the last age in the data (84 here), so ex is expected years lived up to
+85, not full life expectancy.
+"""
+
 import numpy as np
 
 def add_life_tab_col(df, RADIX=100000):
+    """Return a copy of `df` with qx, px, lx, dx, Lx, Tx, ex and Cumulative Survival (lx / RADIX).
+
+    `df` must already be sorted by Year Code, Sex Code, then increasing age (load_filter does
+    this), because lx and Tx are built from row order, not from the age values.
+    """
     validation_df = df.copy()
     if "Single-Year Ages Code" in validation_df.columns:
         validation_df["qx"] = validation_df["Deaths"]/validation_df["Population"]
