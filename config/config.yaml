@@ -13,8 +13,8 @@ data:
   known_data_quality_risk: CDC WONDER suppresses death counts under 10 as the literal string "Suppressed". src/data/cleaning.py:flag_suppressed now flags this explicitly (adds a `{column} Suppressed` boolean column, e.g. `Deaths Suppressed`) before pd.to_numeric(errors="coerce") turns it into an indistinguishable NaN downstream; wired into scripts/national/clean_wonder_exports.py right after combine_datasets, so both processed files (old_1968_1998.csv, new_1999_2024.csv) now carry the flag (currently all-False, since national all-cause single-age counts don't hit the under-10 threshold — this matters once the state/cause/race pull in data_collection_strategy.resolved_decision lands, where it will). Known related gap, not yet fixed — src/data/harmonization.py's aggregate() does a plain 'sum' on Deaths (unlike Population, which already numeric-coerces via sum_or_cat_rule first) and doesn't propagate the Suppressed flag through the groupby — if a suppressed cell ever reaches that function, it would either silently string-concatenate or silently undercount an aggregated bucket rather than flag it. Not currently triggered (harmonization.py only processes the national all-cause single-age data, which the state/cause/race pull is explicitly kept separate from per data_collection_strategy.resolved_decision.scope), but should be fixed before harmonization.py ever runs on data that can be suppressed.
 
 excel_reference:
-  workflow_doc: Phase1_Hands_On/Excel/Mortality Table Project Workflow.docx
-  workbook: Phase1_Hands_On/Excel/Mortality_Workbook.xlsx
+  workflow_doc: archive/phase1_excel/Mortality Table Project Workflow.docx
+  workbook: archive/phase1_excel/Mortality_Workbook.xlsx
   purpose: Use the Excel workbook as the validation reference for formulas, charts, dashboard metrics, and first modeling examples.
   python_data_source_note: Recreate the Excel workflow from data/processed/new_1999_2024.csv instead of importing the workbook's manually exported CDC WONDER CSV.
   validation_depth: Spot-check one age/sex/year combination against the workbook, not a full reconciliation table. See workflow.step_1_baseline_model_prototype.
@@ -48,7 +48,7 @@ current_scope:
 workflow:
   step_1_baseline_model_prototype:
     status: core_logic_complete_in_script_not_yet_refactored
-    implementation: scripts/step1_baseline_model_prototype.py
+    implementation: archive/step1_baseline_model_prototype.py
     description: Prototype the full actuarial workflow end-to-end (life table, graduation methods, Lee-Carter, and kt forecast) on a small validation slice before scaling to the full modern dataset in step 2 and the harmonized long history in step 3. Originally framed as pure Excel validation; that is now a minor spot-check rather than the point of this step.
     input_source: data/processed/new_1999_2024.csv
     source_dataset: modern_single_age_file
@@ -126,7 +126,7 @@ workflow:
     model_selection_rationale: Lee-Carter and Poisson Lee-Carter are the two models genuinely used in real-world mortality and longevity work; Poisson Lee-Carter is the correct refinement because it fits deaths as counts against population exposure instead of only pre-smoothed rates. Deliberately excludes step 1's wider toolbox (Gompertz, Makeham, moving-average, Whittaker-Henderson) as this step's headline model, though those remain available as graduation/smoothing utilities where useful.
     engineering_tasks:
       - Handle CDC WONDER suppressed-cell values explicitly (see data.known_data_quality_risk) before fitting; do not let them silently propagate through the life table.
-      - "src/actuarial/ already holds validated logic extracted from scripts/step1_baseline_model_prototype.py, reused rather than duplicated in this new script."
+      - "src/actuarial/ already holds validated logic extracted from archive/step1_baseline_model_prototype.py, reused rather than duplicated in this new script."
       - Add unit tests for life table invariants (l0 equals radix, lx non-increasing with age, Tx at the final age equals Lx at the final age).
     validation:
       lee_carter_benchmark: Compare ax, bx, and kt against the Human Mortality Database US Lee-Carter output or an equivalent published benchmark; document data differences and define a tolerance before comparing. See quality_bar.lee_carter_benchmark.

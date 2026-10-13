@@ -24,7 +24,7 @@ from the repo root so `src` resolves as a package:
 ```
 python -m scripts.national.clean_wonder_exports
 python -m scripts.national.harmonize_age_groups
-python scripts/step1_baseline_model_prototype.py
+python archive/step1_baseline_model_prototype.py
 python -m scripts.sublevel.validate_credibility      # page 2 inputs (validation_report.csv, grouped/single finals)
 python -m scripts.national.forecast_precompute      # page 3 inputs (data/processed/model/*.csv)
 python -m streamlit run src/dashboard/streamlit_app.py
@@ -64,7 +64,7 @@ demographic tier, then dropped from scope entirely on 2026-09-15 — a deliberat
 finding).
 
 **Actuarial layer (`src/actuarial/`)** builds life tables from cleaned deaths/population counts. The core
-recursion (in both `src/actuarial/life_table.py` and, not-yet-deduplicated, `scripts/step1_baseline_model_prototype.py`)
+recursion (in both `src/actuarial/life_table.py` and, not-yet-deduplicated, `archive/step1_baseline_model_prototype.py`)
 is: `qx = Deaths/Population` → `px = 1-qx` → recursive cohort survivors `lx` (starting at a `RADIX`, e.g. 100000,
 per `Year Code`/`Sex Code` group, walked in increasing age order) → `dx = qx*lx` → `Lx = lx - 0.5*dx` → `Tx`
 (reverse-cumulative sum of `Lx` within each year/sex group) → `ex = Tx/lx`. Rows **must** be sorted by
@@ -215,9 +215,10 @@ plan: the missingness/suppression heatmap (recommended to build first, not yet d
 plot — see `workflow.step_2_modern_single_age_model.eda` in `config.yaml` for the full plot list and which ones
 are dashboard-facing versus internal-only.
 
-**`Phase1_Hands_On/` and `archive/`** hold an earlier Excel-based prototype (workbook + workflow doc) used only as
-a validation reference for spot-checking Python outputs against known-correct formulas — not part of the active
-pipeline.
+**`archive/`** holds superseded work kept for reference, not part of the active pipeline (see `archive/README.md`):
+`phase1_excel/` (the earlier Excel workbook + workflow doc, used as a validation reference for spot-checking Python
+outputs against known-correct formulas; moved from `Phase1_Hands_On/` on 2026-10-13), `phase1_prototype/` (the first
+Python script), `step1_baseline_model_prototype.py` (moved from `scripts/`), and `scratch/`.
 
 ## Streamlit dashboard (`src/dashboard/`) — all three pages built
 
@@ -392,7 +393,7 @@ e-at-age comparison):
   the data, one figure per sex. Historical comparison only, distinct from the forecast e65 fan chart below.
 
 `src/actuarial/forecasting.py` — **done** through the kt forecast and e65 fan chart (ported and generalized
-from `scripts/step1_baseline_model_prototype.py`'s single-sex `forecast_kt`/`plot_kt_forecast` prototype to
+from `archive/step1_baseline_model_prototype.py`'s single-sex `forecast_kt`/`plot_kt_forecast` prototype to
 handle both sexes via per-`Sex Code` loops, and to work off either the SVD or Poisson `kt` fit):
 
 - `calculate_kt_changes(year_all)` / `estimate_drift(year_sorted)` — per-sex `delta_kt = diff(kt)`, then
