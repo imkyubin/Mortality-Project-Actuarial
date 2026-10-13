@@ -11,26 +11,41 @@ reporting layer. The authoritative source of truth for project scope, current st
 `config/config.yaml` — read it before making architectural changes; it documents what's done, what's planned, and
 *why* (rationale for each decision, including rejected alternatives).
 
-The project is early-stage: `src/` has scaffolded modules (many are docstring-only stubs), the real prototyping
-work currently lives in `scripts/`, and known data-quality/engineering gaps are tracked explicitly in
-`config/config.yaml` (`quality_bar` and `data.known_data_quality_risk` sections) rather than in issue tracking.
+Known data-quality/engineering gaps are tracked explicitly in `config/config.yaml` (`quality_bar` and
+`data.known_data_quality_risk` sections) rather than in issue tracking. `src/api/`, `src/reporting/`,
+`src/visualization/` and `src/data/validation.py` are still docstring-only placeholders.
+
+**Repository layout (restructured 2026-10-13).** Folders are named by purpose, while `config.yaml` and the history
+below still speak in project "steps"; the mapping: step 1 (baseline prototype) → `archive/step1_baseline_model_prototype.py`;
+step 2 (national single-age modeling) → `src/actuarial/` (was `src/step2/`) driven by `scripts/national/`; step 3
+(state/cause sublevel + dashboard) → `scripts/sublevel/` and `src/dashboard/` (was `src/step3/`; `api`, `reporting`,
+`visualization` also moved up to `src/`). Scripts were renamed at the same time: `data_cleaning_exploration` →
+`national/clean_wonder_exports`, `data_harmonization` → `national/harmonize_age_groups`, `step2_all_dataset_model` →
+`national/model_diagnostics`, `step3/sublevel_cleaning` → `sublevel/combine_exports`, `step3/sublevel_validation` →
+`sublevel/validate_credibility`, `step3/forecast_precompute` → `national/forecast_precompute`. The Excel prototype
+(`Phase1_Hands_On/`) moved to `archive/phase1_excel/`. `README.md` is the public-facing overview, `data/README.md`
+explains how to recreate the gitignored data, and `archive/README.md` describes what is archived and why.
 
 ## Commands
 
-There is no build/lint/test tooling configured yet (`requirements.txt` and `tests/` are currently empty
-placeholders — see `quality_bar.engineering_hygiene` in `config/config.yaml`). Run scripts directly with Python
-from the repo root so `src` resolves as a package:
+Dependencies are pinned in `requirements.txt` (tested on Python 3.14). There is no lint/test tooling yet (`tests/`
+is an empty placeholder — see `quality_bar.engineering_hygiene` in `config/config.yaml`). Run everything from the
+repo root with `python -m` so `src` resolves as a package. Pipeline order:
 
 ```
-python -m scripts.national.clean_wonder_exports
-python -m scripts.national.harmonize_age_groups
-python archive/step1_baseline_model_prototype.py
-python -m scripts.sublevel.validate_credibility      # page 2 inputs (validation_report.csv, grouped/single finals)
-python -m scripts.national.forecast_precompute      # page 3 inputs (data/processed/model/*.csv)
+python -m scripts.national.clean_wonder_exports     # data/raw -> old_1968_1998.csv, new_1999_2024.csv
+python -m scripts.national.harmonize_age_groups     # -> harmonized_1968-2024.csv (dashboard page 1)
+python -m scripts.national.forecast_precompute      # -> data/processed/model/*.csv (page 3)
+python -m scripts.sublevel.combine_exports          # 11 state/cause exports -> final.csv
+python -m scripts.sublevel.validate_credibility     # -> validation_report.csv, grouped/single finals (page 2)
 python -m streamlit run src/dashboard/streamlit_app.py
+python -m scripts.national.model_diagnostics        # optional: matplotlib diagnostics, writes nothing
+python archive/step1_baseline_model_prototype.py    # optional: archived step-1 prototype
 ```
 
-Dependencies observed in use (not yet pinned anywhere): `pandas`, `numpy`, `matplotlib`, `statsmodels`, `scipy`.
+Known reproducibility quirk (found 2026-10-13, not fixed): `US All Causes.csv` carries an extra text `Sex` column,
+so a fresh `combine_exports` run writes it into `final.csv` and `single_age_final.csv`; the author's local copies
+lack it. Values are otherwise identical and nothing downstream reads the column.
 
 **Git access**: Git is not on this machine's native PowerShell PATH (and isn't installed anywhere findable outside of
 WSL). Run git commands through WSL Ubuntu instead — e.g. `wsl.exe -- git status`, or a WSL bash shell directly.

@@ -1,0 +1,8 @@
+# Tested with Python 3.14. Install with: pip install -r requirements.txt
+pandas==3.0.3
+numpy==2.5.0
+scipy==1.18.0          # Whittaker-Henderson graduation (sparse solve)
+matplotlib==3.11.0     # analysis plots in src/actuarial and scripts/national/model_diagnostics.py
+streamlit==1.64.0      # dashboard
+altair==6.3.0          # dashboard charts
+statsmodels==0.14.6    # only archive/step1_baseline_model_prototype.py

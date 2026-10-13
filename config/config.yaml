@@ -450,10 +450,10 @@ quality_bar:
   description: Criteria for making the project strong enough for a prestigious actuarial/data science review.
   engineering_hygiene:
     requirement: The repo is usable and legible to an outside reviewer, not just runnable by the author.
-    status: gap
+    status: partial (2026-10-13) - README, pinned requirements, data/archive guides, docstrings and a purpose-named folder layout done; unit tests still missing
     evidence_needed:
-      - Populated requirements.txt (currently empty).
-      - Populated README.md (currently empty) explaining what the project is, how to run it, and what is done versus planned.
+      - Populated requirements.txt (done 2026-10-13, pinned versions tested on Python 3.14).
+      - Populated README.md explaining what the project is, how to run it, and what is done versus planned (done 2026-10-13; data/README.md covers recreating the gitignored data).
       - Unit tests for life table invariants and other pure-function logic (tests/ currently empty).
       - Incremental, meaningfully-messaged git commit history rather than one large drop.
   end_to_end_run:
